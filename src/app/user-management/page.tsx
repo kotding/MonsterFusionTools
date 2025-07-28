@@ -37,7 +37,7 @@ export default function UserManagementPage() {
               <TabsTrigger value="db2">Database 2 (iOS)</TabsTrigger>
             </TabsList>
             <TabsContent value="db1">
-                <Card className="mt-4">
+                <Card className="mt-4 overflow-x-auto">
                     <CardHeader>
                         <CardTitle>User List - Database 1</CardTitle>
                     </CardHeader>
@@ -47,7 +47,7 @@ export default function UserManagementPage() {
                 </Card>
             </TabsContent>
             <TabsContent value="db2">
-                 <Card className="mt-4">
+                 <Card className="mt-4 overflow-x-auto">
                     <CardHeader>
                         <CardTitle>User List - Database 2</CardTitle>
                     </CardHeader>
