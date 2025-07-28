@@ -1,5 +1,5 @@
-import { ref, set, get } from "firebase/database";
-import type { GiftCode, Reward } from "@/types";
+import { ref, set, get, remove, child, DataSnapshot } from "firebase/database";
+import type { GiftCode, Reward, EditCodeFormValues } from "@/types";
 import { db1, db2 } from "./firebase"; // Import the initialized database instances
 import { getClassCharForPieceType } from "@/types/rewards";
 
@@ -12,18 +12,16 @@ import { getClassCharForPieceType } from "@/types/rewards";
 export async function addGiftCode(newCodeData: Omit<GiftCode, 'id'>): Promise<GiftCode> {
   const codeRef1 = ref(db1, `RedeemCodes/${newCodeData.code}`);
   
-  // 1. Check if the code already exists in the first database
   const snapshot = await get(codeRef1);
   if (snapshot.exists()) {
     throw new Error(`Code "${newCodeData.code}" already exists.`);
   }
 
-  // Automatically set ClassChar for artifact rewards and reset unused fields
   const processedRewards = newCodeData.listRewards.map((reward: Reward) => {
     if (reward.rewardType === 'ARTIFACT') {
       return {
         ...reward,
-        monsterId: 0, // Reset monsterId for ARTIFACT
+        monsterId: 0,
         artifactInfo: {
           ...reward.artifactInfo,
           ClassChar: getClassCharForPieceType(reward.artifactInfo.Artifact_PieceType),
@@ -36,7 +34,6 @@ export async function addGiftCode(newCodeData: Omit<GiftCode, 'id'>): Promise<Gi
             artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" }
         }
     }
-    // For other types, reset both monsterId and artifactInfo
     return {
         ...reward,
         monsterId: 0,
@@ -50,8 +47,6 @@ export async function addGiftCode(newCodeData: Omit<GiftCode, 'id'>): Promise<Gi
     listRewards: processedRewards,
   };
   
-  // Data to be saved (without the id field, as it's the key)
-  // Use a type assertion to match the expected structure in Firebase
   const dataToSave: Omit<GiftCode, 'id'> = { 
       code: newCodeData.code,
       currClaimCount: newCodeData.currClaimCount,
@@ -61,7 +56,6 @@ export async function addGiftCode(newCodeData: Omit<GiftCode, 'id'>): Promise<Gi
       maxClaimCount: newCodeData.maxClaimCount,
   };
 
-  // 2. Write the new code to both databases simultaneously
   const codeRef2 = ref(db2, `RedeemCodes/${newCodeData.code}`);
   
   try {
@@ -70,11 +64,111 @@ export async function addGiftCode(newCodeData: Omit<GiftCode, 'id'>): Promise<Gi
       set(codeRef2, dataToSave)
     ]);
     
-    console.log("Service: Successfully added gift code to both databases", newEntry);
     return newEntry;
   } catch (error) {
     console.error("Failed to write to one or more databases:", error);
-    // You might want to add rollback logic here if one write fails
     throw new Error("An error occurred while saving the code to the databases.");
   }
+}
+
+/**
+ * Fetches all gift codes from the first database.
+ * @returns A promise that resolves to an array of GiftCode objects.
+ */
+export async function getAllGiftCodes(): Promise<GiftCode[]> {
+    const codesRef = ref(db1, 'RedeemCodes');
+    const snapshot = await get(codesRef);
+    if (snapshot.exists()) {
+        const codesData = snapshot.val();
+        // Convert the object of codes into an array and add the id
+        return Object.keys(codesData).map(key => ({
+            id: key,
+            ...codesData[key]
+        }));
+    }
+    return [];
+}
+
+/**
+ * Deletes a gift code from both databases.
+ * @param codeId The ID of the code to delete.
+ */
+export async function deleteGiftCode(codeId: string): Promise<void> {
+    const codeRef1 = ref(db1, `RedeemCodes/${codeId}`);
+    const codeRef2 = ref(db2, `RedeemCodes/${codeId}`);
+
+    try {
+        await Promise.all([
+            remove(codeRef1),
+            remove(codeRef2)
+        ]);
+    } catch (error) {
+        console.error("Failed to delete from one or more databases:", error);
+        throw new Error("An error occurred while deleting the code.");
+    }
+}
+
+/**
+ * Updates a gift code in both databases.
+ * @param codeId The ID of the code to update.
+ * @param updatedData The data to update.
+ * @returns The updated gift code object.
+ */
+export async function updateGiftCode(codeId: string, updatedData: EditCodeFormValues): Promise<GiftCode> {
+    const codeRef1 = ref(db1, `RedeemCodes/${codeId}`);
+    const codeRef2 = ref(db2, `RedeemCodes/${codeId}`);
+
+    // Fetch the existing code to merge data
+    const snapshot = await get(codeRef1);
+    if (!snapshot.exists()) {
+        throw new Error(`Code "${codeId}" not found.`);
+    }
+    const existingCode = snapshot.val() as GiftCode;
+
+    const expireDate = new Date();
+    expireDate.setDate(expireDate.getDate() + updatedData.expireDays);
+
+    const processedRewards = updatedData.listRewards.map((reward: Reward) => {
+        if (reward.rewardType === 'ARTIFACT') {
+          return {
+            ...reward,
+            monsterId: 0,
+            artifactInfo: {
+              ...reward.artifactInfo,
+              ClassChar: getClassCharForPieceType(reward.artifactInfo.Artifact_PieceType),
+            },
+          };
+        }
+         if (reward.rewardType === 'MONSTER') {
+            return {
+                ...reward,
+                artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" }
+            }
+        }
+        return {
+            ...reward,
+            monsterId: 0,
+            artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" }
+        }
+    });
+
+    const dataToSave: Omit<GiftCode, 'id'> = {
+        ...existingCode,
+        code: codeId,
+        listRewards: processedRewards,
+        maxClaimCount: updatedData.maxClaimCount,
+        currClaimCount: updatedData.currClaimCount,
+        expire: expireDate.toISOString(),
+    };
+
+    try {
+        await Promise.all([
+            set(codeRef1, dataToSave),
+            set(codeRef2, dataToSave)
+        ]);
+        return { ...dataToSave, id: codeId };
+    } catch (error) {
+        console.error("Failed to update one or more databases:", error);
+        throw new Error("An error occurred while updating the code.");
+    }
 }

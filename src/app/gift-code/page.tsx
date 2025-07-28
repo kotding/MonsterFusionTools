@@ -1,6 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ManualCodeCreator } from "@/components/manual-code-creator";
 import { BatchCodeCreator } from "@/components/batch-code-creator";
+import { CodeListManager } from "@/components/code-list-manager";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,17 +31,25 @@ export default function GiftCodePage() {
         </div>
       </header>
       <main className="flex-1 p-4 md:p-6 lg:p-8">
-        <div className="mx-auto max-w-2xl">
+        <div className="mx-auto w-full max-w-6xl">
           <Tabs defaultValue="manual">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="manual">Tạo code thủ công</TabsTrigger>
               <TabsTrigger value="batch">Tạo code hàng loạt</TabsTrigger>
+              <TabsTrigger value="list">Danh sách Gift Code</TabsTrigger>
             </TabsList>
             <TabsContent value="manual">
-              <ManualCodeCreator />
+               <div className="mx-auto max-w-2xl">
+                <ManualCodeCreator />
+              </div>
             </TabsContent>
             <TabsContent value="batch">
-              <BatchCodeCreator />
+               <div className="mx-auto max-w-2xl">
+                <BatchCodeCreator />
+              </div>
+            </TabsContent>
+            <TabsContent value="list">
+              <CodeListManager />
             </TabsContent>
           </Tabs>
         </div>

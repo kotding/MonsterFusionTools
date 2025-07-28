@@ -33,6 +33,15 @@ export const batchGiftCodeSchema = z.object({
   expireDays: z.coerce.number().min(1, "Expiration must be at least 1 day.").default(365),
 });
 
+// Zod schema for editing an existing gift code
+export const editCodeSchema = z.object({
+  listRewards: z.array(rewardSchema).min(1, "At least one reward is required."),
+  maxClaimCount: z.coerce.number().min(0, "Max claims must be at least 0.").default(1),
+  currClaimCount: z.coerce.number().min(0, "Current claims must be at least 0.").default(0),
+  expireDays: z.coerce.number().min(1, "Expiration must be at least 1 day.").default(365),
+});
+export type EditCodeFormValues = z.infer<typeof editCodeSchema>;
+
 
 // Base type for a single reward, can be inferred from the schema
 export type Reward = z.infer<typeof rewardSchema>;
