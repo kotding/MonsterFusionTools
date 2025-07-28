@@ -11,3 +11,16 @@ export type Data = z.infer<typeof dataSchema> & {
   id: string;
   timestamp: number;
 };
+
+// Zod schema for gift code form validation
+export const giftCodeSchema = z.object({
+  code: z.string().min(3, "Code must be at least 3 characters long.").max(30, "Code must be 30 characters or less."),
+  reward: z.string().min(1, "Reward is required."),
+});
+
+// TypeScript type for GiftCode
+export type GiftCode = z.infer<typeof giftCodeSchema> & {
+  id: string;
+  createdAt: number;
+  isUsed: boolean;
+};

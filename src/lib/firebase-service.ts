@@ -1,4 +1,4 @@
-import type { Data } from "@/types";
+import type { Data, GiftCode } from "@/types";
 
 // This is a mock database. In a real application, you would interact
 // with Firebase Firestore or Realtime Database here.
@@ -10,6 +10,9 @@ let mockData: Data[] = [
   { id: '5', name: 'New Signups (24h)', value: '78', timestamp: Date.now() - 500000 },
   { id: '6', name: 'Error Rate', value: '0.12%', timestamp: Date.now() - 600000 },
 ];
+
+let mockGiftCodes: GiftCode[] = [];
+
 
 // Simulate network delay to mimic real-world API calls
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -76,4 +79,21 @@ export async function deleteData(id: string): Promise<{ id: string }> {
   }
   console.log("Mock Service: Deleted data with id", id);
   return { id };
+}
+
+/**
+ * Adds a new gift code.
+ * Replace this with your actual Firebase `addDoc` or `set` call to your gift_codes collection/path.
+ */
+export async function addGiftCode(newCode: Omit<GiftCode, 'id' | 'createdAt' | 'isUsed'>): Promise<GiftCode> {
+  await wait(100);
+  const newEntry: GiftCode = {
+    ...newCode,
+    id: (Math.random() + 1).toString(36).substring(7),
+    createdAt: Date.now(),
+    isUsed: false,
+  };
+  mockGiftCodes = [newEntry, ...mockGiftCodes];
+  console.log("Mock Service: Added gift code", newEntry);
+  return newEntry;
 }
