@@ -37,22 +37,22 @@ export default function UserManagementPage() {
               <TabsTrigger value="db2">Database 2 (iOS)</TabsTrigger>
             </TabsList>
             <TabsContent value="db1">
-                <Card className="mt-4 overflow-x-auto">
+                <Card className="mt-4">
                     <CardHeader>
                         <CardTitle>User List - Database 1</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <UserManager dbKey="db1" />
+                        <UserManager key="db1" dbKey="db1" />
                     </CardContent>
                 </Card>
             </TabsContent>
             <TabsContent value="db2">
-                 <Card className="mt-4 overflow-x-auto">
+                 <Card className="mt-4">
                     <CardHeader>
                         <CardTitle>User List - Database 2</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <UserManager dbKey="db2" />
+                        <UserManager key="db2" dbKey="db2" />
                     </CardContent>
                 </Card>
             </TabsContent>

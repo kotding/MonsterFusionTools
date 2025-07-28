@@ -29,7 +29,6 @@ import {
 import type { User, BannedAccounts, DbKey } from "@/types";
 import { Loader2, ArrowUpDown, UserX, UserCheck } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
-import { Card } from "./ui/card";
 
 type SortKey = "MonsterLevel" | "NumDiamond" | "NumGold" | "default";
 
@@ -149,8 +148,8 @@ export function UserManager({ dbKey }: UserManagerProps) {
             </Select>
         </div>
       </div>
-      <div className="rounded-md border">
-        <ScrollArea className="h-[60vh]">
+      <div className="rounded-md border overflow-x-auto">
+        <ScrollArea className="h-[60vh] min-w-[800px]">
           <Table>
             <TableHeader className="sticky top-0 bg-background">
               <TableRow>
