@@ -168,7 +168,7 @@ export function UserManager({ dbKey }: UserManagerProps) {
               <TableRow>
                 <TableHead className="w-[80px]">Avatar</TableHead>
                 <TableHead>Username</TableHead>
-                <TableHead className="w-[200px]">UID</TableHead>
+                <TableHead>UID</TableHead>
                 <TableHead className="text-right">Level</TableHead>
                 <TableHead className="text-right">Diamond</TableHead>
                 <TableHead className="text-right">Gold</TableHead>
@@ -197,11 +197,20 @@ export function UserManager({ dbKey }: UserManagerProps) {
                         data-ai-hint="avatar"
                       />
                     </TableCell>
-                    <TableCell className="font-medium">{user.UserName}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground w-40">
+                    <TableCell className="font-medium">
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="w-40 inline-block">{truncateString(user.UserName, 40)}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>{user.UserName}</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
                       <Tooltip>
                         <TooltipTrigger asChild>
-                           <span>{truncateString(user.UID, 10)}</span>
+                           <span className="w-40 inline-block">{truncateString(user.UID, 40)}</span>
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>{user.UID}</p>

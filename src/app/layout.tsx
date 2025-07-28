@@ -3,7 +3,10 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: 'Firebase Connector',
+  title: {
+    default: "MoonlightTool",
+    template: "%s | MoonlightTool",
+  },
   description: 'Visualize and manage your Firebase data.',
 };
 

@@ -4,6 +4,11 @@ import { Button } from "@/components/ui/button";
 import { UserManager } from "@/components/user-manager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "User Management",
+};
 
 export default function UserManagementPage() {
   return (
