@@ -2,9 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
-import { Loader2, Download } from "lucide-react";
+import { Loader2, Download, PlusCircle, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -16,9 +16,18 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { addGiftCode } from "@/lib/firebase-service";
 import type { GiftCode } from "@/types";
+import { batchGiftCodeSchema } from "@/types";
+import { REWARD_TYPES } from "@/types/rewards";
 import {
   Card,
   CardContent,
@@ -28,14 +37,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ScrollArea } from "./ui/scroll-area";
+import { Separator } from "./ui/separator";
 
-const batchCodeSchema = z.object({
-  prefix: z.string().max(10, "Prefix must be 10 characters or less."),
-  quantity: z.coerce.number().min(1, "Quantity must be at least 1.").max(100, "Cannot create more than 100 codes at once."),
-  reward: z.string().min(1, "Reward is required."),
-});
-
-type BatchCodeFormValues = z.infer<typeof batchCodeSchema>;
+const batchCodeFormSchema = batchGiftCodeSchema;
+type BatchCodeFormValues = z.infer<typeof batchCodeFormSchema>;
 
 export function BatchCodeCreator() {
   const [isPending, startTransition] = useTransition();
@@ -43,53 +48,84 @@ export function BatchCodeCreator() {
   const { toast } = useToast();
 
   const form = useForm<BatchCodeFormValues>({
-    resolver: zodResolver(batchCodeSchema),
+    resolver: zodResolver(batchCodeFormSchema),
     defaultValues: {
-      prefix: "CODE",
+      prefix: "moonlight",
       quantity: 10,
-      reward: "",
+      listRewards: [{ rewardType: "DIAMOND", rewardAmount: 100 }],
+      maxClaimCount: 1,
+      expireDays: 365,
     },
+  });
+  
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "listRewards",
   });
 
   const generateRandomCode = (prefix: string) => {
-    const randomPart = Math.random().toString(36).substring(2, 10).toUpperCase();
-    return `${prefix}${randomPart}`;
-  }
+    const randomPart = Math.random().toString(36).substring(2, 10);
+    return `${prefix}_${randomPart}`;
+  };
 
   const handleBatchCreate = (values: BatchCodeFormValues) => {
     startTransition(async () => {
-      try {
-        const newCodes: GiftCode[] = [];
-        for (let i = 0; i < values.quantity; i++) {
-          const newCode = await addGiftCode({
-            code: generateRandomCode(values.prefix),
-            reward: values.reward,
-          });
-          newCodes.push(newCode);
+      const newCodes: GiftCode[] = [];
+      const errors: string[] = [];
+      
+      const expireDate = new Date();
+      expireDate.setDate(expireDate.getDate() + values.expireDays);
+      const expireISO = expireDate.toISOString();
+
+      for (let i = 0; i < values.quantity; i++) {
+        const code = generateRandomCode(values.prefix);
+        const newCodeData: Omit<GiftCode, "id"> = {
+            code: code,
+            listRewards: values.listRewards.map(r => ({ ...r, monsterId: 0, artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" } })),
+            maxClaimCount: values.maxClaimCount,
+            currClaimCount: 0,
+            day: 1,
+            expire: expireISO,
+        };
+        try {
+            const newCode = await addGiftCode(newCodeData);
+            newCodes.push(newCode);
+        } catch (error: any) {
+            errors.push(error.message || `Failed to create code ${code}`);
         }
-        setGeneratedCodes(newCodes);
+      }
+      
+      setGeneratedCodes(newCodes);
+      
+      if(newCodes.length > 0) {
         toast({
           title: "Success!",
           description: `${newCodes.length} gift codes created successfully.`,
-        });
-        form.reset();
-      } catch (error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Could not create the batch of gift codes.",
+          variant: "default",
+          className: "bg-green-500 text-white",
         });
       }
+
+      if (errors.length > 0) {
+         toast({
+          variant: "destructive",
+          title: "Some codes failed",
+          description: `${errors.length} codes could not be created. They might already exist.`,
+        });
+      }
+      
+      form.reset();
     });
   };
   
   const downloadCodes = () => {
-    const text = generatedCodes.map(c => `${c.code}, ${c.reward}`).join('\n');
-    const blob = new Blob([text], { type: 'text/csv' });
+    if (generatedCodes.length === 0) return;
+    const text = generatedCodes.map(c => c.code).join('\n');
+    const blob = new Blob([text], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'gift-codes.csv';
+    a.download = 'gift-codes.txt';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -101,7 +137,7 @@ export function BatchCodeCreator() {
       <CardHeader>
         <CardTitle>Tạo code hàng loạt</CardTitle>
         <CardDescription>
-          Tạo nhiều gift code cùng một lúc với cùng một phần thưởng.
+          Tạo nhiều gift code cùng một lúc với cùng một bộ phần thưởng.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -110,45 +146,127 @@ export function BatchCodeCreator() {
             onSubmit={form.handleSubmit(handleBatchCreate)}
             className="space-y-6"
           >
-            <FormField
-              control={form.control}
-              name="prefix"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Code Prefix (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., SUMMER" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="quantity"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Quantity</FormLabel>
-                  <FormControl>
-                    <Input type="number" placeholder="e.g., 50" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="reward"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Reward</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., 500 Diamonds" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="prefix"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Code Prefix</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., moonlight" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="quantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quantity</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="e.g., 50" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+            </div>
+            
+            <div className="space-y-4">
+                <FormLabel>Rewards</FormLabel>
+                {fields.map((field, index) => (
+                    <div key={field.id} className="flex items-end gap-2 p-3 border rounded-md relative">
+                        <FormField
+                            control={form.control}
+                            name={`listRewards.${index}.rewardType`}
+                            render={({ field }) => (
+                                <FormItem className="flex-1">
+                                    <FormLabel>Reward Type</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select a reward type" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {REWARD_TYPES.map(type => (
+                                                <SelectItem key={type} value={type}>{type}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name={`listRewards.${index}.rewardAmount`}
+                            render={({ field }) => (
+                                <FormItem className="w-32">
+                                    <FormLabel>Amount</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" placeholder="100" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                         <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            onClick={() => remove(index)}
+                            disabled={fields.length <= 1}
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </div>
+                ))}
+                 <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => append({ rewardType: "GOLD", rewardAmount: 1000 })}
+                >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add Reward
+                </Button>
+            </div>
+
+            <Separator />
+            
+            <div className="grid grid-cols-2 gap-4">
+               <FormField
+                  control={form.control}
+                  name="maxClaimCount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Max Claims Per Code</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="1" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="expireDays"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Expires in (days)</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="365" {...field} />
+                      </FormControl>
+                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
+            </div>
+
             <Button type="submit" disabled={isPending} className="w-full">
               {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isPending ? "Generating..." : "Generate Codes"}
@@ -164,7 +282,7 @@ export function BatchCodeCreator() {
                 </p>
                 <Button variant="outline" size="sm" onClick={downloadCodes}>
                     <Download className="mr-2 h-4 w-4" />
-                    Download CSV
+                    Download Codes (.txt)
                 </Button>
             </div>
             <ScrollArea className="h-64 w-full rounded-md border bg-background p-2">
@@ -172,7 +290,6 @@ export function BatchCodeCreator() {
                     {generatedCodes.map((code) => (
                         <div key={code.id} className="flex justify-between border-b py-2 last:border-none">
                             <p className="font-mono text-sm text-primary">{code.code}</p>
-                             <p className="text-sm text-muted-foreground">{code.reward}</p>
                         </div>
                     ))}
                 </div>
