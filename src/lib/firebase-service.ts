@@ -1,7 +1,9 @@
-import { ref, set, get, remove, child, DataSnapshot } from "firebase/database";
-import type { GiftCode, Reward, EditCodeFormValues, User, BannedAccounts } from "@/types";
+import { ref, set, get, remove, child, DataSnapshot, Database } from "firebase/database";
+import type { GiftCode, Reward, EditCodeFormValues, User, BannedAccounts, DbKey } from "@/types";
 import { db1, db2 } from "./firebase"; // Import the initialized database instances
 import { getClassCharForPieceType } from "@/types/rewards";
+
+const dbs: Record<DbKey, Database> = { db1, db2 };
 
 /**
  * Adds a new gift code to both Firebase Realtime Databases under "RedeemCodes".
@@ -176,11 +178,13 @@ export async function updateGiftCode(codeId: string, updatedData: EditCodeFormVa
 // --- User Management ---
 
 /**
- * Fetches all users from the first database.
+ * Fetches all users from the specified database.
+ * @param dbKey The key of the database to fetch from ('db1' or 'db2').
  * @returns A promise that resolves to an array of User objects.
  */
-export async function getAllUsers(): Promise<User[]> {
-    const usersRef = ref(db1, 'Users');
+export async function getAllUsers(dbKey: DbKey): Promise<User[]> {
+    const selectedDb = dbs[dbKey];
+    const usersRef = ref(selectedDb, 'Users');
     const snapshot = await get(usersRef);
     if (snapshot.exists()) {
         const usersData = snapshot.val();
@@ -193,47 +197,45 @@ export async function getAllUsers(): Promise<User[]> {
 }
 
 /**
- * Fetches the list of banned user UIDs.
+ * Fetches the list of banned user UIDs from the specified database.
+ * @param dbKey The key of the database to fetch from ('db1' or 'db2').
  * @returns A promise that resolves to a BannedAccounts object.
  */
-export async function getBannedAccounts(): Promise<BannedAccounts> {
-    const bannedRef = ref(db1, 'BannedAccounts');
+export async function getBannedAccounts(dbKey: DbKey): Promise<BannedAccounts> {
+    const selectedDb = dbs[dbKey];
+    const bannedRef = ref(selectedDb, 'BannedAccounts');
     const snapshot = await get(bannedRef);
     return snapshot.exists() ? snapshot.val() : {};
 }
 
 /**
- * Bans a user by adding their UID to the BannedAccounts list in both databases.
+ * Bans a user by adding their UID to the BannedAccounts list in the specified database.
  * @param uid The UID of the user to ban.
+ * @param dbKey The key of the database to update ('db1' or 'db2').
  */
-export async function banUser(uid: string): Promise<void> {
-    const banRef1 = ref(db1, `BannedAccounts/${uid}`);
-    const banRef2 = ref(db2, `BannedAccounts/${uid}`);
+export async function banUser(uid: string, dbKey: DbKey): Promise<void> {
+    const selectedDb = dbs[dbKey];
+    const banRef = ref(selectedDb, `BannedAccounts/${uid}`);
     try {
-        await Promise.all([
-            set(banRef1, "Banned"),
-            set(banRef2, "Banned")
-        ]);
+        await set(banRef, "Banned");
     } catch (error) {
-        console.error("Failed to ban user in one or more databases:", error);
-        throw new Error("An error occurred while banning the user.");
+        console.error(`Failed to ban user in ${dbKey}:`, error);
+        throw new Error(`An error occurred while banning the user in ${dbKey}.`);
     }
 }
 
 /**
- * Unbans a user by removing their UID from the BannedAccounts list in both databases.
+ * Unbans a user by removing their UID from the BannedAccounts list in the specified database.
  * @param uid The UID of the user to unban.
+ * @param dbKey The key of the database to update ('db1' or 'db2').
  */
-export async function unbanUser(uid: string): Promise<void> {
-    const banRef1 = ref(db1, `BannedAccounts/${uid}`);
-    const banRef2 = ref(db2, `BannedAccounts/${uid}`);
+export async function unbanUser(uid: string, dbKey: DbKey): Promise<void> {
+    const selectedDb = dbs[dbKey];
+    const banRef = ref(selectedDb, `BannedAccounts/${uid}`);
     try {
-        await Promise.all([
-            remove(banRef1),
-            remove(banRef2)
-        ]);
+        await remove(banRef);
     } catch (error) {
-        console.error("Failed to unban user in one or more databases:", error);
-        throw new Error("An error occurred while unbanning the user.");
+        console.error(`Failed to unban user in ${dbKey}:`, error);
+        throw new Error(`An error occurred while unbanning the user in ${dbKey}.`);
     }
 }

@@ -26,14 +26,18 @@ import {
   banUser,
   unbanUser,
 } from "@/lib/firebase-service";
-import type { User, BannedAccounts } from "@/types";
+import type { User, BannedAccounts, DbKey } from "@/types";
 import { Loader2, ArrowUpDown, UserX, UserCheck } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
 import { Card } from "./ui/card";
 
 type SortKey = "MonsterLevel" | "NumDiamond" | "NumGold" | "default";
 
-export function UserManager() {
+type UserManagerProps = {
+    dbKey: DbKey;
+};
+
+export function UserManager({ dbKey }: UserManagerProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [bannedAccounts, setBannedAccounts] = useState<BannedAccounts>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -46,8 +50,8 @@ export function UserManager() {
     setIsLoading(true);
     try {
       const [userList, bannedList] = await Promise.all([
-        getAllUsers(),
-        getBannedAccounts(),
+        getAllUsers(dbKey),
+        getBannedAccounts(dbKey),
       ]);
       setUsers(userList);
       setBannedAccounts(bannedList);
@@ -55,7 +59,7 @@ export function UserManager() {
       toast({
         variant: "destructive",
         title: "Error fetching data",
-        description: "Could not retrieve user or ban list.",
+        description: `Could not retrieve user or ban list from ${dbKey}.`,
       });
     } finally {
       setIsLoading(false);
@@ -64,23 +68,23 @@ export function UserManager() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [dbKey]);
 
   const handleBanToggle = (user: User) => {
     startActionTransition(async () => {
       try {
         if (user.isBanned) {
-          await unbanUser(user.id);
+          await unbanUser(user.id, dbKey);
           toast({
             title: "User Unbanned",
-            description: `${user.UserName} has been successfully unbanned.`,
+            description: `${user.UserName} has been successfully unbanned on ${dbKey}.`,
             className: "bg-green-500 text-white",
           });
         } else {
-          await banUser(user.id);
+          await banUser(user.id, dbKey);
           toast({
             title: "User Banned",
-            description: `${user.UserName} has been successfully banned.`,
+            description: `${user.UserName} has been successfully banned on ${dbKey}.`,
             variant: "destructive",
           });
         }
@@ -122,7 +126,7 @@ export function UserManager() {
   };
 
   return (
-    <Card className="p-4 sm:p-6">
+    <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
         <Input
           placeholder="Search by Username or UID..."
@@ -146,7 +150,7 @@ export function UserManager() {
         </div>
       </div>
       <div className="rounded-md border">
-        <ScrollArea className="h-[70vh]">
+        <ScrollArea className="h-[60vh]">
           <Table>
             <TableHeader className="sticky top-0 bg-background">
               <TableRow>
@@ -219,6 +223,6 @@ export function UserManager() {
           </Table>
         </ScrollArea>
       </div>
-    </Card>
+    </div>
   );
 }

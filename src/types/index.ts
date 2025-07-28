@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { REWARD_TYPES, ARTIFACT_RARITIES, ARTIFACT_PIECE_TYPES } from "./rewards";
 
+export type DbKey = "db1" | "db2";
+
 // Schema for the artifact information object
 export const artifactInfoSchema = z.object({
   Artifact_PieceType: z.enum(ARTIFACT_PIECE_TYPES).default("None"),

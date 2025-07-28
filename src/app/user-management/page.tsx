@@ -2,6 +2,8 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserManager } from "@/components/user-manager";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function UserManagementPage() {
   return (
@@ -29,7 +31,32 @@ export default function UserManagementPage() {
       </header>
       <main className="flex-1 p-4 md:p-6 lg:p-8">
         <div className="mx-auto w-full max-w-7xl">
-          <UserManager />
+           <Tabs defaultValue="db1">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="db1">Database 1 (Android)</TabsTrigger>
+              <TabsTrigger value="db2">Database 2 (iOS)</TabsTrigger>
+            </TabsList>
+            <TabsContent value="db1">
+                <Card className="mt-4">
+                    <CardHeader>
+                        <CardTitle>User List - Database 1</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <UserManager dbKey="db1" />
+                    </CardContent>
+                </Card>
+            </TabsContent>
+            <TabsContent value="db2">
+                 <Card className="mt-4">
+                    <CardHeader>
+                        <CardTitle>User List - Database 2</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <UserManager dbKey="db2" />
+                    </CardContent>
+                </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
     </div>
