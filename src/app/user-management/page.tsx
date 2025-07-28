@@ -30,7 +30,7 @@ export default function UserManagementPage() {
         </div>
       </header>
       <main className="flex-1 p-4 md:p-6 lg:p-8">
-        <div className="mx-auto w-full max-w-7xl">
+        <div className="mx-auto w-full max-w-6xl">
            <Tabs defaultValue="db1">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="db1">Database 1 (Android)</TabsTrigger>
