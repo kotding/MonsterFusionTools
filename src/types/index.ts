@@ -12,7 +12,7 @@ export const artifactInfoSchema = z.object({
 export const rewardSchema = z.object({
   rewardType: z.enum(REWARD_TYPES),
   rewardAmount: z.coerce.number().min(1, "Amount must be at least 1."),
-  monsterId: z.number().default(0),
+  monsterId: z.coerce.number().default(0),
   artifactInfo: artifactInfoSchema.default({}),
 });
 

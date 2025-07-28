@@ -18,18 +18,30 @@ export async function addGiftCode(newCodeData: Omit<GiftCode, 'id'>): Promise<Gi
     throw new Error(`Code "${newCodeData.code}" already exists.`);
   }
 
-  // Automatically set ClassChar for artifact rewards
+  // Automatically set ClassChar for artifact rewards and reset unused fields
   const processedRewards = newCodeData.listRewards.map((reward: Reward) => {
     if (reward.rewardType === 'ARTIFACT') {
       return {
         ...reward,
+        monsterId: 0, // Reset monsterId for ARTIFACT
         artifactInfo: {
           ...reward.artifactInfo,
           ClassChar: getClassCharForPieceType(reward.artifactInfo.Artifact_PieceType),
         },
       };
     }
-    return reward;
+    if (reward.rewardType === 'MONSTER') {
+        return {
+            ...reward,
+            artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" }
+        }
+    }
+    // For other types, reset both monsterId and artifactInfo
+    return {
+        ...reward,
+        monsterId: 0,
+        artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" }
+    }
   });
 
   const newEntry: GiftCode = {

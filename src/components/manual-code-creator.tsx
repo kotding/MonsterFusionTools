@@ -45,54 +45,71 @@ function RewardFields({ index, control }: { index: number, control: any }) {
   });
 
   return (
-    rewardType === "ARTIFACT" && (
-      <div className="mt-2 grid grid-cols-2 gap-2 rounded-md border p-2">
-        <FormField
+    <div className="mt-2 space-y-2">
+      {rewardType === "ARTIFACT" && (
+        <div className="grid grid-cols-2 gap-2 rounded-md border p-2">
+          <FormField
+              control={control}
+              name={`listRewards.${index}.artifactInfo.Artifact_PieceType`}
+              render={({ field }) => (
+                  <FormItem>
+                      <FormLabel className="text-xs">Piece Type</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                              <SelectTrigger>
+                                  <SelectValue placeholder="Select piece type" />
+                              </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                              {ARTIFACT_PIECE_TYPES.map(type => (
+                                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                              ))}
+                          </SelectContent>
+                      </Select>
+                      <FormMessage />
+                  </FormItem>
+              )}
+          />
+          <FormField
+              control={control}
+              name={`listRewards.${index}.artifactInfo.Artifact_Rarity`}
+              render={({ field }) => (
+                  <FormItem>
+                      <FormLabel className="text-xs">Rarity</FormLabel>
+                       <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                              <SelectTrigger>
+                                  <SelectValue placeholder="Select rarity" />
+                              </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                              {ARTIFACT_RARITIES.map(type => (
+                                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                              ))}
+                          </SelectContent>
+                      </Select>
+                      <FormMessage />
+                  </FormItem>
+              )}
+          />
+        </div>
+      )}
+      {rewardType === "MONSTER" && (
+         <FormField
             control={control}
-            name={`listRewards.${index}.artifactInfo.Artifact_PieceType`}
+            name={`listRewards.${index}.monsterId`}
             render={({ field }) => (
                 <FormItem>
-                    <FormLabel className="text-xs">Piece Type</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select piece type" />
-                            </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                            {ARTIFACT_PIECE_TYPES.map(type => (
-                                <SelectItem key={type} value={type}>{type}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <FormLabel className="text-xs">Monster ID</FormLabel>
+                    <FormControl>
+                        <Input type="number" placeholder="Enter Monster ID" {...field} onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)} value={field.value} />
+                    </FormControl>
                     <FormMessage />
                 </FormItem>
             )}
         />
-        <FormField
-            control={control}
-            name={`listRewards.${index}.artifactInfo.Artifact_Rarity`}
-            render={({ field }) => (
-                <FormItem>
-                    <FormLabel className="text-xs">Rarity</FormLabel>
-                     <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select rarity" />
-                            </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                            {ARTIFACT_RARITIES.map(type => (
-                                <SelectItem key={type} value={type}>{type}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                </FormItem>
-            )}
-        />
-      </div>
-    )
+      )}
+    </div>
   );
 }
 
@@ -150,12 +167,16 @@ export function ManualCodeCreator() {
             if (r.rewardType === 'ARTIFACT') {
               return {
                 ...r,
+                 monsterId: 0,
                 artifactInfo: {
                   ...r.artifactInfo,
                   ClassChar: getClassCharForPieceType(r.artifactInfo.Artifact_PieceType)
                 }
               }
             }
+             if(r.rewardType !== 'MONSTER') {
+                return { ...r, monsterId: 0 }
+             }
             return {
               ...r,
               artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" }
