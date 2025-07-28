@@ -1,5 +1,5 @@
 import { ref, set, get, remove, child, DataSnapshot } from "firebase/database";
-import type { GiftCode, Reward, EditCodeFormValues } from "@/types";
+import type { GiftCode, Reward, EditCodeFormValues, User, BannedAccounts } from "@/types";
 import { db1, db2 } from "./firebase"; // Import the initialized database instances
 import { getClassCharForPieceType } from "@/types/rewards";
 
@@ -170,5 +170,70 @@ export async function updateGiftCode(codeId: string, updatedData: EditCodeFormVa
     } catch (error) {
         console.error("Failed to update one or more databases:", error);
         throw new Error("An error occurred while updating the code.");
+    }
+}
+
+// --- User Management ---
+
+/**
+ * Fetches all users from the first database.
+ * @returns A promise that resolves to an array of User objects.
+ */
+export async function getAllUsers(): Promise<User[]> {
+    const usersRef = ref(db1, 'Users');
+    const snapshot = await get(usersRef);
+    if (snapshot.exists()) {
+        const usersData = snapshot.val();
+        return Object.keys(usersData).map(key => ({
+            id: key,
+            ...usersData[key]
+        }));
+    }
+    return [];
+}
+
+/**
+ * Fetches the list of banned user UIDs.
+ * @returns A promise that resolves to a BannedAccounts object.
+ */
+export async function getBannedAccounts(): Promise<BannedAccounts> {
+    const bannedRef = ref(db1, 'BannedAccounts');
+    const snapshot = await get(bannedRef);
+    return snapshot.exists() ? snapshot.val() : {};
+}
+
+/**
+ * Bans a user by adding their UID to the BannedAccounts list in both databases.
+ * @param uid The UID of the user to ban.
+ */
+export async function banUser(uid: string): Promise<void> {
+    const banRef1 = ref(db1, `BannedAccounts/${uid}`);
+    const banRef2 = ref(db2, `BannedAccounts/${uid}`);
+    try {
+        await Promise.all([
+            set(banRef1, "Banned"),
+            set(banRef2, "Banned")
+        ]);
+    } catch (error) {
+        console.error("Failed to ban user in one or more databases:", error);
+        throw new Error("An error occurred while banning the user.");
+    }
+}
+
+/**
+ * Unbans a user by removing their UID from the BannedAccounts list in both databases.
+ * @param uid The UID of the user to unban.
+ */
+export async function unbanUser(uid: string): Promise<void> {
+    const banRef1 = ref(db1, `BannedAccounts/${uid}`);
+    const banRef2 = ref(db2, `BannedAccounts/${uid}`);
+    try {
+        await Promise.all([
+            remove(banRef1),
+            remove(banRef2)
+        ]);
+    } catch (error) {
+        console.error("Failed to unban user in one or more databases:", error);
+        throw new Error("An error occurred while unbanning the user.");
     }
 }

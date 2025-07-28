@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Gift } from 'lucide-react';
+import { Gift, Users } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -43,6 +43,21 @@ export default function Home() {
               <CardContent className="flex-grow">
                 <CardDescription>
                   Create and manage gift codes for your users.
+                </CardDescription>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/user-management">
+            <Card className="flex h-full flex-col transition-all hover:shadow-lg hover:-translate-y-1">
+              <CardHeader>
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                  <Users className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle>User Management</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-grow">
+                <CardDescription>
+                  View, search, and manage user accounts.
                 </CardDescription>
               </CardContent>
             </Card>

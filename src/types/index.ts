@@ -56,3 +56,20 @@ export type GiftCode = {
   listRewards: Reward[];
   maxClaimCount: number;
 };
+
+// Represents the structure of a user object in Firebase
+export type User = {
+  id: string; // UID
+  AvatarUrl: string;
+  MonsterLevel: number;
+  NumDiamond: number;
+  NumGold: number;
+  UID: string;
+  UserName: string;
+  isBanned?: boolean; // Added for UI state
+};
+
+// Represents the structure of the BannedAccounts object in Firebase
+export type BannedAccounts = {
+  [uid: string]: "Banned";
+};
