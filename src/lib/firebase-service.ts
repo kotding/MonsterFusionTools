@@ -1,38 +1,19 @@
+import { ref, set, get } from "firebase/database";
 import type { GiftCode } from "@/types";
-
-// This is a mock database. In a real application, you would interact
-// with Firebase Firestore or Realtime Database here.
-const mockDatabase: { RedeemCodes: Record<string, Omit<GiftCode, 'id'>> } = {
-    RedeemCodes: {}
-};
-
-
-// Simulate network delay to mimic real-world API calls
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
+import { db1, db2 } from "./firebase"; // Import the initialized database instances
 
 /**
- * Fetches all data entries.
- * Replace this with your actual Firebase `getDocs` or `onValue` call.
- */
-// This function is not used in the gift code creator but is kept for reference
-// export async function getData(): Promise<Data[]> {
-//   await wait(500);
-//   console.log("Mock Service: Fetching data");
-//   return [];
-// }
-
-
-/**
- * Adds a new gift code to the mock database under "RedeemCodes".
- * In a real Firebase implementation, the `code` would be the key/document ID.
+ * Adds a new gift code to both Firebase Realtime Databases under "RedeemCodes".
  * @param newCodeData - The data for the new gift code.
  * @returns The created gift code object.
+ * @throws An error if the code already exists in the first database.
  */
 export async function addGiftCode(newCodeData: Omit<GiftCode, 'id'>): Promise<GiftCode> {
-  await wait(100);
+  const codeRef1 = ref(db1, `RedeemCodes/${newCodeData.code}`);
   
-  if (mockDatabase.RedeemCodes[newCodeData.code]) {
+  // 1. Check if the code already exists in the first database
+  const snapshot = await get(codeRef1);
+  if (snapshot.exists()) {
     throw new Error(`Code "${newCodeData.code}" already exists.`);
   }
 
@@ -41,13 +22,23 @@ export async function addGiftCode(newCodeData: Omit<GiftCode, 'id'>): Promise<Gi
     id: newCodeData.code,
   };
   
-  // In Firebase Realtime DB, you would do something like:
-  // const db = getDatabase();
-  // await set(ref(db, 'RedeemCodes/' + newEntry.code), newCodeData);
-  mockDatabase.RedeemCodes[newEntry.code] = newCodeData;
-  
-  console.log("Mock Service: Added gift code to RedeemCodes", newEntry);
-  console.log("Current DB state:", mockDatabase);
+  // Data to be saved (without the id field, as it's the key)
+  const dataToSave: Omit<GiftCode, 'id'> = { ...newCodeData };
 
-  return newEntry;
+  // 2. Write the new code to both databases simultaneously
+  const codeRef2 = ref(db2, `RedeemCodes/${newCodeData.code}`);
+  
+  try {
+    await Promise.all([
+      set(codeRef1, dataToSave),
+      set(codeRef2, dataToSave)
+    ]);
+    
+    console.log("Service: Successfully added gift code to both databases", newEntry);
+    return newEntry;
+  } catch (error) {
+    console.error("Failed to write to one or more databases:", error);
+    // You might want to add rollback logic here if one write fails
+    throw new Error("An error occurred while saving the code to the databases.");
+  }
 }
