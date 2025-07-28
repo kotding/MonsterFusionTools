@@ -1,17 +1,19 @@
 import { z } from "zod";
-import { REWARD_TYPES } from "./rewards";
+import { REWARD_TYPES, ARTIFACT_RARITIES, ARTIFACT_PIECE_TYPES } from "./rewards";
+
+// Schema for the artifact information object
+export const artifactInfoSchema = z.object({
+  Artifact_PieceType: z.enum(ARTIFACT_PIECE_TYPES).default("None"),
+  Artifact_Rarity: z.enum(ARTIFACT_RARITIES).default("None"),
+  ClassChar: z.string().default("A"),
+});
 
 // Base schema for a single reward
 export const rewardSchema = z.object({
   rewardType: z.enum(REWARD_TYPES),
   rewardAmount: z.coerce.number().min(1, "Amount must be at least 1."),
-  // These fields are part of the final JSON but not directly on the form
   monsterId: z.number().default(0),
-  artifactInfo: z.object({
-    Artifact_PieceType: z.string().default("None"),
-    Artifact_Rarity: z.string().default("None"),
-    ClassChar: z.string().default("A"),
-  }).default({}),
+  artifactInfo: artifactInfoSchema.default({}),
 });
 
 // Zod schema for manual gift code form validation

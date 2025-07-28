@@ -1,6 +1,7 @@
 import { ref, set, get } from "firebase/database";
-import type { GiftCode } from "@/types";
+import type { GiftCode, Reward } from "@/types";
 import { db1, db2 } from "./firebase"; // Import the initialized database instances
+import { getClassCharForPieceType } from "@/types/rewards";
 
 /**
  * Adds a new gift code to both Firebase Realtime Databases under "RedeemCodes".
@@ -17,13 +18,36 @@ export async function addGiftCode(newCodeData: Omit<GiftCode, 'id'>): Promise<Gi
     throw new Error(`Code "${newCodeData.code}" already exists.`);
   }
 
+  // Automatically set ClassChar for artifact rewards
+  const processedRewards = newCodeData.listRewards.map((reward: Reward) => {
+    if (reward.rewardType === 'ARTIFACT') {
+      return {
+        ...reward,
+        artifactInfo: {
+          ...reward.artifactInfo,
+          ClassChar: getClassCharForPieceType(reward.artifactInfo.Artifact_PieceType),
+        },
+      };
+    }
+    return reward;
+  });
+
   const newEntry: GiftCode = {
     ...newCodeData,
     id: newCodeData.code,
+    listRewards: processedRewards,
   };
   
   // Data to be saved (without the id field, as it's the key)
-  const dataToSave: Omit<GiftCode, 'id'> = { ...newCodeData };
+  // Use a type assertion to match the expected structure in Firebase
+  const dataToSave: Omit<GiftCode, 'id'> = { 
+      code: newCodeData.code,
+      currClaimCount: newCodeData.currClaimCount,
+      day: newCodeData.day,
+      expire: newCodeData.expire,
+      listRewards: processedRewards,
+      maxClaimCount: newCodeData.maxClaimCount,
+  };
 
   // 2. Write the new code to both databases simultaneously
   const codeRef2 = ref(db2, `RedeemCodes/${newCodeData.code}`);

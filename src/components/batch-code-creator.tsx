@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { Loader2, Download, PlusCircle, Trash2 } from "lucide-react";
 
@@ -27,7 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { addGiftCode } from "@/lib/firebase-service";
 import type { GiftCode } from "@/types";
 import { batchGiftCodeSchema } from "@/types";
-import { REWARD_TYPES } from "@/types/rewards";
+import { REWARD_TYPES, ARTIFACT_PIECE_TYPES, ARTIFACT_RARITIES, getClassCharForPieceType } from "@/types/rewards";
 import {
   Card,
   CardContent,
@@ -42,6 +42,64 @@ import { Separator } from "./ui/separator";
 const batchCodeFormSchema = batchGiftCodeSchema;
 type BatchCodeFormValues = z.infer<typeof batchCodeFormSchema>;
 
+function RewardFields({ index, control }: { index: number, control: any }) {
+  const rewardType = useWatch({
+    control,
+    name: `listRewards.${index}.rewardType`,
+  });
+
+  return (
+    rewardType === "ARTIFACT" && (
+      <div className="mt-2 grid grid-cols-2 gap-2 rounded-md border p-2">
+        <FormField
+            control={control}
+            name={`listRewards.${index}.artifactInfo.Artifact_PieceType`}
+            render={({ field }) => (
+                <FormItem>
+                    <FormLabel className="text-xs">Piece Type</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select piece type" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            {ARTIFACT_PIECE_TYPES.map(type => (
+                                <SelectItem key={type} value={type}>{type}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <FormMessage />
+                </FormItem>
+            )}
+        />
+        <FormField
+            control={control}
+            name={`listRewards.${index}.artifactInfo.Artifact_Rarity`}
+            render={({ field }) => (
+                <FormItem>
+                    <FormLabel className="text-xs">Rarity</FormLabel>
+                     <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select rarity" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            {ARTIFACT_RARITIES.map(type => (
+                                <SelectItem key={type} value={type}>{type}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <FormMessage />
+                </FormItem>
+            )}
+        />
+      </div>
+    )
+  );
+}
+
 export function BatchCodeCreator() {
   const [isPending, startTransition] = useTransition();
   const [generatedCodes, setGeneratedCodes] = useState<GiftCode[]>([]);
@@ -52,7 +110,12 @@ export function BatchCodeCreator() {
     defaultValues: {
       prefix: "moonlight",
       quantity: 10,
-      listRewards: [{ rewardType: "DIAMOND", rewardAmount: 100 }],
+      listRewards: [{ 
+          rewardType: "DIAMOND", 
+          rewardAmount: 100,
+          monsterId: 0, 
+          artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" } 
+      }],
       maxClaimCount: 1,
       expireDays: 365,
     },
@@ -77,11 +140,27 @@ export function BatchCodeCreator() {
       expireDate.setDate(expireDate.getDate() + values.expireDays);
       const expireISO = expireDate.toISOString();
 
+      const processedRewards = values.listRewards.map(r => {
+        if (r.rewardType === 'ARTIFACT') {
+          return {
+            ...r,
+            artifactInfo: {
+              ...r.artifactInfo,
+              ClassChar: getClassCharForPieceType(r.artifactInfo.Artifact_PieceType)
+            }
+          }
+        }
+        return {
+          ...r,
+          artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" }
+        }
+      });
+
       for (let i = 0; i < values.quantity; i++) {
         const code = generateRandomCode(values.prefix);
         const newCodeData: Omit<GiftCode, "id"> = {
             code: code,
-            listRewards: values.listRewards.map(r => ({ ...r, monsterId: 0, artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" } })),
+            listRewards: processedRewards,
             maxClaimCount: values.maxClaimCount,
             currClaimCount: 0,
             day: 1,
@@ -182,57 +261,67 @@ export function BatchCodeCreator() {
             <div className="space-y-3">
                 <FormLabel>Rewards</FormLabel>
                 {fields.map((field, index) => (
-                    <div key={field.id} className="flex items-center gap-2 p-2 border rounded-md">
-                        <FormField
-                            control={form.control}
-                            name={`listRewards.${index}.rewardType`}
-                            render={({ field }) => (
-                                <FormItem className="flex-1">
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select a reward type" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {REWARD_TYPES.map(type => (
-                                                <SelectItem key={type} value={type}>{type}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name={`listRewards.${index}.rewardAmount`}
-                            render={({ field }) => (
-                                <FormItem className="w-28">
-                                    <FormControl>
-                                        <Input type="number" placeholder="Amount" {...field} onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)} value={field.value} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                         <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="text-muted-foreground hover:text-destructive"
-                            onClick={() => remove(index)}
-                        >
-                            <Trash2 className="h-4 w-4" />
-                             <span className="sr-only">Remove reward</span>
-                        </Button>
+                    <div key={field.id} className="rounded-md border p-3">
+                      <div className="flex items-start gap-2">
+                          <div className="flex-1 space-y-2">
+                              <FormField
+                                  control={form.control}
+                                  name={`listRewards.${index}.rewardType`}
+                                  render={({ field }) => (
+                                      <FormItem>
+                                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                              <FormControl>
+                                                  <SelectTrigger>
+                                                      <SelectValue placeholder="Select a reward type" />
+                                                  </SelectTrigger>
+                                              </FormControl>
+                                              <SelectContent>
+                                                  {REWARD_TYPES.map(type => (
+                                                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                                                  ))}
+                                              </SelectContent>
+                                          </Select>
+                                          <FormMessage />
+                                      </FormItem>
+                                  )}
+                              />
+                              <FormField
+                                  control={form.control}
+                                  name={`listRewards.${index}.rewardAmount`}
+                                  render={({ field }) => (
+                                      <FormItem>
+                                          <FormControl>
+                                              <Input type="number" placeholder="Amount" {...field} onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)} value={field.value} />
+                                          </FormControl>
+                                          <FormMessage />
+                                      </FormItem>
+                                  )}
+                              />
+                          </div>
+                          <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="shrink-0 text-muted-foreground hover:text-destructive"
+                              onClick={() => remove(index)}
+                          >
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Remove reward</span>
+                          </Button>
+                      </div>
+                      <RewardFields index={index} control={form.control} />
                     </div>
                 ))}
                  <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => append({ rewardType: "GOLD", rewardAmount: 1000 })}
+                    onClick={() => append({ 
+                        rewardType: "GOLD", 
+                        rewardAmount: 1000,
+                        monsterId: 0, 
+                        artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" } 
+                    })}
                 >
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Add Reward

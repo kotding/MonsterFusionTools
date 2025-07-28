@@ -62,3 +62,42 @@ export const REWARD_TYPES = [
     "THUNDER_EGG",
     "SOLO_BATTLE_TICKET",
 ] as const;
+
+export const ARTIFACT_RARITIES = [
+    "None",
+    "NORMAL",
+    "UNCOMMON",
+    "RARE",
+    "EPIC",
+    "LEGEND",
+    "DIVINE",
+    "SUPREME",
+] as const;
+
+export const ARTIFACT_PIECE_TYPES = [
+    "None",
+    "WolfClaw", "WolfFang", "WolfEye", "Wolf_FullSet",
+    "LionClaw", "LionHeart", "LionTail", "Lion_FullSet",
+    "WildBoarTusk", "WildBoarFeet", "WildBoarTail", "WildBoar_FullSet",
+    "BeeWing", "BeeTail", "BeeEye", "Bee_FullSet",
+    "SharkFin", "SharkJaw", "SharkTail", "Shark_FullSet",
+    "UnicornHorn", "UnicornClaw", "UnicornTail", "Unicorn_FullSet",
+    "DragonScale", "DragonHorn", "DragonClaw", "Dragon_FullSet",
+] as const;
+
+type ArtifactPieceType = typeof ARTIFACT_PIECE_TYPES[number];
+
+const PIECE_TYPE_TO_CLASS_CHAR: Record<ArtifactPieceType, string> = {
+    None: "A",
+    WolfClaw: "A", WolfFang: "A", WolfEye: "A", Wolf_FullSet: "A",
+    LionClaw: "B", LionHeart: "B", LionTail: "B", Lion_FullSet: "B",
+    WildBoarTusk: "C", WildBoarFeet: "C", WildBoarTail: "C", WildBoar_FullSet: "C",
+    BeeWing: "D", BeeTail: "D", BeeEye: "D", Bee_FullSet: "D",
+    SharkFin: "E", SharkJaw: "E", SharkTail: "E", Shark_FullSet: "E",
+    UnicornHorn: "F", UnicornClaw: "F", UnicornTail: "F", Unicorn_FullSet: "F",
+    DragonScale: "G", DragonHorn: "G", DragonClaw: "G", Dragon_FullSet: "G",
+};
+
+export function getClassCharForPieceType(pieceType: ArtifactPieceType): string {
+    return PIECE_TYPE_TO_CLASS_CHAR[pieceType] || "A";
+}
