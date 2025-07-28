@@ -67,7 +67,7 @@ export function UserManager({ dbKey }: UserManagerProps) {
 
   useEffect(() => {
     fetchData();
-  }, [dbKey]);
+  }, [dbKey, toast]);
 
   const handleBanToggle = (user: User) => {
     startActionTransition(async () => {
