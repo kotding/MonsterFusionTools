@@ -177,7 +177,7 @@ export function UserManager({ dbKey }: UserManagerProps) {
                     <TableCell>
                       <Image
                         src={user.AvatarUrl || `https://placehold.co/40x40.png`}
-                        alt={user.UserName}
+                        alt={user.UserName || 'User avatar'}
                         width={40}
                         height={40}
                         className="rounded-full"
