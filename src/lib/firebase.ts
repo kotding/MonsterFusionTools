@@ -5,13 +5,13 @@ import { getDatabase } from "firebase/database";
 // --- Configuration for the first database ---
 const firebaseConfig1 = {
   // Replace with your first database URL
-  databaseURL: "https://monster-fusion-test-android-default-rtdb.firebaseio.com", 
+  databaseURL: "https://monsterfusion-c0e4e-default-rtdb.firebaseio.com", 
 };
 
 // --- Configuration for the second database ---
 const firebaseConfig2 = {
   // Replace with your second database URL
-  databaseURL: "https://monster-fusion-test-android-default-rtdb.firebaseio.com",
+  databaseURL: "https://monster-fusion-ios-default-rtdb.firebaseio.com",
 };
 
 // Initialize the Firebase apps. We give them unique names to avoid conflicts.
