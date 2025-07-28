@@ -2,7 +2,9 @@ import type { GiftCode } from "@/types";
 
 // This is a mock database. In a real application, you would interact
 // with Firebase Firestore or Realtime Database here.
-let mockGiftCodes: Record<string, Omit<GiftCode, 'id'>> = {};
+const mockDatabase: { RedeemCodes: Record<string, Omit<GiftCode, 'id'>> } = {
+    RedeemCodes: {}
+};
 
 
 // Simulate network delay to mimic real-world API calls
@@ -22,7 +24,7 @@ const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 
 /**
- * Adds a new gift code to the mock database.
+ * Adds a new gift code to the mock database under "RedeemCodes".
  * In a real Firebase implementation, the `code` would be the key/document ID.
  * @param newCodeData - The data for the new gift code.
  * @returns The created gift code object.
@@ -30,7 +32,7 @@ const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 export async function addGiftCode(newCodeData: Omit<GiftCode, 'id'>): Promise<GiftCode> {
   await wait(100);
   
-  if (mockGiftCodes[newCodeData.code]) {
+  if (mockDatabase.RedeemCodes[newCodeData.code]) {
     throw new Error(`Code "${newCodeData.code}" already exists.`);
   }
 
@@ -41,11 +43,11 @@ export async function addGiftCode(newCodeData: Omit<GiftCode, 'id'>): Promise<Gi
   
   // In Firebase Realtime DB, you would do something like:
   // const db = getDatabase();
-  // await set(ref(db, 'giftcodes/' + newEntry.code), newCodeData);
-  mockGiftCodes[newEntry.code] = newCodeData;
+  // await set(ref(db, 'RedeemCodes/' + newEntry.code), newCodeData);
+  mockDatabase.RedeemCodes[newEntry.code] = newCodeData;
   
-  console.log("Mock Service: Added gift code", newEntry);
-  console.log("Current DB state:", mockGiftCodes);
+  console.log("Mock Service: Added gift code to RedeemCodes", newEntry);
+  console.log("Current DB state:", mockDatabase);
 
   return newEntry;
 }

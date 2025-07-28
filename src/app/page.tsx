@@ -50,7 +50,6 @@ export default function Home() {
         </div>
       </div>
       <footer className="border-t bg-background/80 px-4 py-4 text-center text-sm text-muted-foreground md:px-6">
-        <p>Built with Next.js and ShadCN UI.</p>
       </footer>
     </main>
   );
