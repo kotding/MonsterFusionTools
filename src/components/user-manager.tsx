@@ -131,7 +131,7 @@ export function UserManager({ dbKey }: UserManagerProps) {
   };
   
   const truncateString = (str: string, num: number) => {
-    if (str.length <= num) {
+    if (!str || str.length <= num) {
       return str;
     }
     return str.slice(0, num) + '...';
@@ -198,7 +198,7 @@ export function UserManager({ dbKey }: UserManagerProps) {
                       />
                     </TableCell>
                     <TableCell className="font-medium">{user.UserName}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
+                    <TableCell className="font-mono text-xs text-muted-foreground w-40">
                       <Tooltip>
                         <TooltipTrigger asChild>
                            <span>{truncateString(user.UID, 10)}</span>
