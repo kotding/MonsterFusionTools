@@ -19,6 +19,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import {
   getAllUsers,
@@ -67,7 +73,7 @@ export function UserManager({ dbKey }: UserManagerProps) {
 
   useEffect(() => {
     fetchData();
-  }, [dbKey, toast]);
+  }, [dbKey]);
 
   const handleBanToggle = (user: User) => {
     startActionTransition(async () => {
@@ -123,9 +129,16 @@ export function UserManager({ dbKey }: UserManagerProps) {
   const formatNumber = (num: number) => {
     return new Intl.NumberFormat("en-US").format(num);
   };
+  
+  const truncateString = (str: string, num: number) => {
+    if (str.length <= num) {
+      return str;
+    }
+    return str.slice(0, num) + '...';
+  };
 
   return (
-    <div>
+    <TooltipProvider>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
         <Input
           placeholder="Search by Username or UID..."
@@ -155,7 +168,7 @@ export function UserManager({ dbKey }: UserManagerProps) {
               <TableRow>
                 <TableHead className="w-[80px]">Avatar</TableHead>
                 <TableHead>Username</TableHead>
-                <TableHead>UID</TableHead>
+                <TableHead className="w-[200px]">UID</TableHead>
                 <TableHead className="text-right">Level</TableHead>
                 <TableHead className="text-right">Diamond</TableHead>
                 <TableHead className="text-right">Gold</TableHead>
@@ -185,7 +198,16 @@ export function UserManager({ dbKey }: UserManagerProps) {
                       />
                     </TableCell>
                     <TableCell className="font-medium">{user.UserName}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{user.UID}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                           <span>{truncateString(user.UID, 10)}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{user.UID}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableCell>
                     <TableCell className="text-right">{formatNumber(user.MonsterLevel)}</TableCell>
                     <TableCell className="text-right text-blue-500">{formatNumber(user.NumDiamond)}</TableCell>
                     <TableCell className="text-right text-amber-500">{formatNumber(user.NumGold)}</TableCell>
@@ -222,6 +244,6 @@ export function UserManager({ dbKey }: UserManagerProps) {
           </Table>
         </ScrollArea>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
