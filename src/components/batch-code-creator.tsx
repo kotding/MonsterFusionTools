@@ -114,7 +114,11 @@ export function BatchCodeCreator() {
         });
       }
       
-      form.reset();
+      form.reset({
+        ...form.getValues(),
+        prefix: values.prefix,
+        quantity: values.quantity,
+      });
     });
   };
   
@@ -167,7 +171,7 @@ export function BatchCodeCreator() {
                     <FormItem>
                       <FormLabel>Quantity</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="e.g., 50" {...field} />
+                        <Input type="number" placeholder="e.g., 50" {...field} onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)} value={field.value}/>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -175,16 +179,15 @@ export function BatchCodeCreator() {
                 />
             </div>
             
-            <div className="space-y-4">
+            <div className="space-y-3">
                 <FormLabel>Rewards</FormLabel>
                 {fields.map((field, index) => (
-                    <div key={field.id} className="flex items-end gap-2 p-3 border rounded-md relative">
+                    <div key={field.id} className="flex items-center gap-2 p-2 border rounded-md">
                         <FormField
                             control={form.control}
                             name={`listRewards.${index}.rewardType`}
                             render={({ field }) => (
                                 <FormItem className="flex-1">
-                                    <FormLabel>Reward Type</FormLabel>
                                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                                         <FormControl>
                                             <SelectTrigger>
@@ -205,10 +208,9 @@ export function BatchCodeCreator() {
                             control={form.control}
                             name={`listRewards.${index}.rewardAmount`}
                             render={({ field }) => (
-                                <FormItem className="w-32">
-                                    <FormLabel>Amount</FormLabel>
+                                <FormItem className="w-28">
                                     <FormControl>
-                                        <Input type="number" placeholder="100" {...field} />
+                                        <Input type="number" placeholder="Amount" {...field} onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)} value={field.value} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -216,12 +218,13 @@ export function BatchCodeCreator() {
                         />
                          <Button
                             type="button"
-                            variant="destructive"
+                            variant="ghost"
                             size="icon"
+                            className="text-muted-foreground hover:text-destructive"
                             onClick={() => remove(index)}
-                            disabled={fields.length <= 1}
                         >
                             <Trash2 className="h-4 w-4" />
+                             <span className="sr-only">Remove reward</span>
                         </Button>
                     </div>
                 ))}
@@ -246,7 +249,7 @@ export function BatchCodeCreator() {
                     <FormItem>
                       <FormLabel>Max Claims Per Code</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="1" {...field} />
+                        <Input type="number" placeholder="1" {...field} onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)} value={field.value}/>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -259,7 +262,7 @@ export function BatchCodeCreator() {
                     <FormItem>
                       <FormLabel>Expires in (days)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="365" {...field} />
+                        <Input type="number" placeholder="365" {...field} onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)} value={field.value}/>
                       </FormControl>
                        <FormMessage />
                     </FormItem>
@@ -277,19 +280,19 @@ export function BatchCodeCreator() {
       {generatedCodes.length > 0 && (
          <CardFooter className="mt-6 flex flex-col items-start gap-4 rounded-lg border bg-secondary/50 p-4">
             <div className="flex w-full items-center justify-between">
-                <p className="text-sm font-semibold text-foreground">
+                <h3 className="text-lg font-semibold text-foreground">
                     Generated Codes ({generatedCodes.length})
-                </p>
+                </h3>
                 <Button variant="outline" size="sm" onClick={downloadCodes}>
                     <Download className="mr-2 h-4 w-4" />
-                    Download Codes (.txt)
+                    Download (.txt)
                 </Button>
             </div>
             <ScrollArea className="h-64 w-full rounded-md border bg-background p-2">
-                <div className="p-2">
+                <div className="p-2 font-mono text-sm">
                     {generatedCodes.map((code) => (
-                        <div key={code.id} className="flex justify-between border-b py-2 last:border-none">
-                            <p className="font-mono text-sm text-primary">{code.code}</p>
+                        <div key={code.id} className="border-b py-2 last:border-none">
+                           {code.code}
                         </div>
                     ))}
                 </div>

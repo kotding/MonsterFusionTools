@@ -14,7 +14,6 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
@@ -26,13 +25,12 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { addGiftCode } from "@/lib/firebase-service";
-import { manualGiftCodeSchema, type GiftCode, type Reward } from "@/types";
+import { manualGiftCodeSchema, type GiftCode } from "@/types";
 import { REWARD_TYPES } from "@/types/rewards";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -63,6 +61,18 @@ export function ManualCodeCreator() {
     const randomPart = Math.random().toString(36).substring(2, 7);
     form.setValue("code", `moonlight_${randomPart}`);
   };
+
+  const copyCode = () => {
+    const code = form.getValues("code");
+    if (code) {
+      navigator.clipboard.writeText(code);
+      toast({
+        title: "Copied!",
+        description: `Code "${code}" copied to clipboard.`,
+      });
+    }
+  };
+
 
   const handleCreateCode = (values: ManualCodeFormValues) => {
     startTransition(async () => {
@@ -126,8 +136,19 @@ export function ManualCodeCreator() {
                       variant="outline"
                       size="icon"
                       onClick={generateRandomCode}
+                      aria-label="Generate random code"
                     >
                       <Shuffle className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={copyCode}
+                      disabled={!field.value}
+                      aria-label="Copy code"
+                    >
+                      <Copy className="h-4 w-4" />
                     </Button>
                   </div>
                   <FormMessage />
@@ -135,16 +156,15 @@ export function ManualCodeCreator() {
               )}
             />
             
-            <div className="space-y-4">
+            <div className="space-y-3">
                 <FormLabel>Rewards</FormLabel>
                 {fields.map((field, index) => (
-                    <div key={field.id} className="flex items-end gap-2 p-3 border rounded-md relative">
+                    <div key={field.id} className="flex items-center gap-2 p-2 border rounded-md">
                         <FormField
                             control={form.control}
                             name={`listRewards.${index}.rewardType`}
                             render={({ field }) => (
                                 <FormItem className="flex-1">
-                                    <FormLabel>Reward Type</FormLabel>
                                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                                         <FormControl>
                                             <SelectTrigger>
@@ -165,10 +185,9 @@ export function ManualCodeCreator() {
                             control={form.control}
                             name={`listRewards.${index}.rewardAmount`}
                             render={({ field }) => (
-                                <FormItem className="w-32">
-                                    <FormLabel>Amount</FormLabel>
+                                <FormItem className="w-28">
                                     <FormControl>
-                                        <Input type="number" placeholder="100" {...field} />
+                                        <Input type="number" placeholder="Amount" {...field} onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)} value={field.value} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -176,12 +195,13 @@ export function ManualCodeCreator() {
                         />
                          <Button
                             type="button"
-                            variant="destructive"
+                            variant="ghost"
                             size="icon"
+                            className="text-muted-foreground hover:text-destructive"
                             onClick={() => remove(index)}
-                            disabled={fields.length <= 1}
                         >
                             <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Remove reward</span>
                         </Button>
                     </div>
                 ))}
@@ -206,7 +226,7 @@ export function ManualCodeCreator() {
                     <FormItem>
                       <FormLabel>Max Claims</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="1" {...field} />
+                        <Input type="number" placeholder="1" {...field} onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)} value={field.value} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -219,7 +239,7 @@ export function ManualCodeCreator() {
                     <FormItem>
                       <FormLabel>Expires in (days)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="365" {...field} />
+                        <Input type="number" placeholder="365" {...field} onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)} value={field.value} />
                       </FormControl>
                        <FormMessage />
                     </FormItem>
