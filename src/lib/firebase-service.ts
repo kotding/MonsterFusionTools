@@ -244,7 +244,8 @@ export async function uploadFile(
   path: string,
   onProgress: (progress: number) => void
 ): Promise<string> {
-  const fileRef = storageRef(storage1, `${FILE_STORAGE_ROOT}${path}${file.name}`);
+  const fullPath = `${FILE_STORAGE_ROOT}${path}${file.name}`;
+  const fileRef = storageRef(storage1, fullPath);
   const uploadTask = uploadBytesResumable(fileRef, file);
 
   return new Promise((resolve, reject) => {
@@ -256,7 +257,7 @@ export async function uploadFile(
       },
       (error) => {
         console.error("Upload failed:", error);
-        reject(new Error("File upload failed."));
+        reject(new Error(`File upload failed for ${file.name}.`));
       },
       async () => {
         const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);

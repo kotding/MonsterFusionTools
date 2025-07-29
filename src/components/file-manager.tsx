@@ -17,7 +17,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { listFiles, uploadFile, deleteItem, createFolder } from "@/lib/firebase-service";
 import type { StoredFile } from "@/types";
-import { UploadCloud, File, Trash2, Download, Copy, Loader2, RefreshCw, Folder, FolderPlus, ChevronRight } from "lucide-react";
+import { UploadCloud, File as FileIcon, Trash2, Download, Copy, Loader2, RefreshCw, Folder, FolderPlus, ChevronRight, Image as ImageIcon, Video, FileText, FileArchive, Music, FileQuestion } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +29,18 @@ import {
 } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+
+const getFileIcon = (mimeType: string) => {
+    if (mimeType.startsWith('image/')) return <ImageIcon className="h-5 w-5 text-blue-500" />;
+    if (mimeType.startsWith('video/')) return <Video className="h-5 w-5 text-purple-500" />;
+    if (mimeType.startsWith('audio/')) return <Music className="h-5 w-5 text-pink-500" />;
+    if (mimeType === 'application/pdf' || mimeType.startsWith('text/')) return <FileText className="h-5 w-5 text-green-500" />;
+    if (mimeType.startsWith('application/vnd.android.package-archive')) return <FileIcon className="h-5 w-5 text-teal-500" />;
+    if (mimeType.startsWith('application/zip') || mimeType.startsWith('application/x-rar-compressed')) return <FileArchive className="h-5 w-5 text-orange-500" />;
+    if (mimeType === 'application/octet-stream') return null; // Don't show icon for placeholder
+    return <FileQuestion className="h-5 w-5 text-muted-foreground" />;
+};
+
 
 export function FileManager() {
   const [currentPath, setCurrentPath] = useState("");
@@ -52,7 +64,8 @@ export function FileManager() {
         if (!a.isFolder && b.isFolder) return 1;
         return a.name.localeCompare(b.name);
       });
-      setItems(sortedItems);
+      // Filter out the placeholder file from the view
+      setItems(sortedItems.filter(item => item.name !== '.placeholder'));
     } catch (error) {
       toast({
         variant: "destructive",
@@ -82,43 +95,51 @@ export function FileManager() {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleFileUpload(e.dataTransfer.files);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
+    if (e.target.files && e.target.files.length > 0) {
       handleFileUpload(e.target.files);
     }
   };
 
   const handleFileUpload = async (fileList: FileList) => {
-    const file = fileList[0];
-    if (!file) return;
+    if (!fileList || fileList.length === 0) return;
 
     setIsUploading(true);
     setUploadProgress(0);
 
+    const uploadPromises = [];
+    for (const file of fileList) {
+        uploadPromises.push(uploadFile(file, currentPath, (progress) => {
+            // For multi-file uploads, progress can be averaged, or just show for the last file.
+            // Simple approach: show overall progress if possible, or just the latest.
+            setUploadProgress(progress);
+        }));
+    }
+
     try {
-      await uploadFile(file, currentPath, setUploadProgress);
-      toast({
-        title: "Upload Successful",
-        description: `File "${file.name}" has been uploaded.`,
-        className: "bg-green-500 text-white",
-      });
-      fetchFiles(currentPath); // Refresh the list
+        await Promise.all(uploadPromises);
+        toast({
+            title: "Upload Successful",
+            description: `${fileList.length} file(s) have been uploaded.`,
+            className: "bg-green-500 text-white",
+        });
+        fetchFiles(currentPath); // Refresh the list
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Upload Failed",
-        description: error.message || "An unexpected error occurred.",
-      });
+        toast({
+            variant: "destructive",
+            title: "Upload Failed",
+            description: error.message || "An unexpected error occurred during upload.",
+        });
     } finally {
-      setIsUploading(false);
-      if(fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+        setIsUploading(false);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
     }
   };
   
@@ -201,12 +222,12 @@ export function FileManager() {
         onDragLeave={handleDrag}
         onDrop={handleDrop}
     >
-      <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} disabled={isUploading} />
+      <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} disabled={isUploading} multiple />
       
       {dragActive && (
         <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-primary bg-background/80">
             <UploadCloud className="h-16 w-16 text-primary" />
-            <p className="mt-4 text-lg font-semibold text-primary">Drop file to upload</p>
+            <p className="mt-4 text-lg font-semibold text-primary">Drop files to upload</p>
         </div>
       )}
       
@@ -278,7 +299,7 @@ export function FileManager() {
                     <TableRow key={item.path} onDoubleClick={() => item.isFolder && setCurrentPath(item.path)} className={cn(item.isFolder && "cursor-pointer")}>
                         <TableCell className="font-medium">
                            <div className="flex items-center gap-2">
-                            {item.isFolder ? <Folder className="h-5 w-5 text-yellow-500" /> : <File className="h-5 w-5 text-muted-foreground" />}
+                            {item.isFolder ? <Folder className="h-5 w-5 text-yellow-500" /> : getFileIcon(item.type)}
                             <span>{item.name}</span>
                            </div>
                         </TableCell>
