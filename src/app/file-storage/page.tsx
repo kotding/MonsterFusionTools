@@ -10,8 +10,8 @@ export const metadata: Metadata = {
 
 export default function FileStoragePage() {
   return (
-    <div className="flex min-h-screen w-full flex-col">
-      <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur md:px-6">
+    <div className="flex h-screen w-full flex-col">
+      <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur md:px-6">
         <div className="flex items-center gap-4">
           <Link href="/" passHref>
             <Button variant="outline" size="icon" className="h-8 w-8">
@@ -25,8 +25,8 @@ export default function FileStoragePage() {
           </div>
         </div>
       </header>
-      <main className="flex-1 p-4 md:p-6 lg:p-8">
-        <div className="mx-auto w-full max-w-6xl">
+      <main className="flex-1 overflow-hidden p-4 md:p-6 lg:p-8">
+        <div className="mx-auto h-full w-full max-w-6xl">
             <FileManager />
         </div>
       </main>

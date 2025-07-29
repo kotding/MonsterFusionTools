@@ -1,10 +1,11 @@
 import { ref, set, get, remove, child, DataSnapshot, Database } from "firebase/database";
-import { ref as storageRef, uploadBytesResumable, getDownloadURL, listAll, deleteObject, type StorageReference, type FirebaseStorage } from "firebase/storage";
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, listAll, deleteObject, uploadString, getMetadata, type StorageReference, type FirebaseStorage } from "firebase/storage";
 import type { GiftCode, Reward, EditCodeFormValues, User, BannedAccounts, DbKey, StoredFile } from "@/types";
 import { db1, db2, storage1, storage2 } from "./firebase"; // Import the initialized instances
 import { getClassCharForPieceType } from "@/types/rewards";
 
 const dbs: Record<DbKey, Database> = { db1, db2 };
+// For file manager, we will primarily use storage1 as the single source of truth.
 const storages: Record<DbKey, FirebaseStorage> = { db1: storage1, db2: storage2 };
 
 
@@ -229,20 +230,21 @@ export async function unbanUser(uid: string, dbKey: DbKey): Promise<void> {
 
 // --- File Storage ---
 
+const FILE_STORAGE_ROOT = 'FileStorage/';
+
 /**
- * Uploads a file to Firebase Storage.
+ * Uploads a file to a specific path in Firebase Storage.
  * @param file The file to upload.
- * @param dbKey The key of the storage to use.
+ * @param path The path within the storage bucket to upload to.
  * @param onProgress A callback to report upload progress.
  * @returns A promise that resolves with the download URL.
  */
 export async function uploadFile(
   file: File,
-  dbKey: DbKey,
+  path: string,
   onProgress: (progress: number) => void
 ): Promise<string> {
-  const selectedStorage = storages[dbKey];
-  const fileRef = storageRef(selectedStorage, `uploads/${file.name}`);
+  const fileRef = storageRef(storage1, `${FILE_STORAGE_ROOT}${path}${file.name}`);
   const uploadTask = uploadBytesResumable(fileRef, file);
 
   return new Promise((resolve, reject) => {
@@ -265,43 +267,91 @@ export async function uploadFile(
 }
 
 /**
- * Lists all files in the uploads directory.
- * @param dbKey The key of the storage to use.
+ * Lists all files and folders in a given path.
+ * @param path The path to list contents from.
  * @returns A promise that resolves to an array of StoredFile objects.
  */
-export async function listFiles(dbKey: DbKey): Promise<StoredFile[]> {
-  const selectedStorage = storages[dbKey];
-  const listRef = storageRef(selectedStorage, 'uploads');
+export async function listFiles(path: string): Promise<StoredFile[]> {
+  const listRef = storageRef(storage1, `${FILE_STORAGE_ROOT}${path}`);
   const res = await listAll(listRef);
   
-  const files = await Promise.all(
-    res.items.map(async (itemRef) => {
-      const downloadURL = await getDownloadURL(itemRef);
-      const metadata = await itemRef.getMetadata();
-      return {
-        name: metadata.name,
-        url: downloadURL,
-        size: metadata.size,
-        type: metadata.contentType || 'unknown',
-        created: metadata.timeCreated,
-      };
-    })
-  );
-  return files;
+  const folders = res.prefixes.map(async (folderRef) => {
+    return {
+      name: folderRef.name,
+      path: folderRef.fullPath.replace(FILE_STORAGE_ROOT, ''),
+      isFolder: true,
+      size: 0,
+      url: '',
+      type: 'folder',
+      created: new Date().toISOString(), // Folders don't have creation dates
+    };
+  });
+
+  const files = res.items.map(async (itemRef) => {
+    const metadata = await getMetadata(itemRef);
+    const downloadURL = await getDownloadURL(itemRef);
+    return {
+      name: metadata.name,
+      path: metadata.fullPath.replace(FILE_STORAGE_ROOT, ''),
+      isFolder: false,
+      url: downloadURL,
+      size: metadata.size,
+      type: metadata.contentType || 'unknown',
+      created: metadata.timeCreated,
+    };
+  });
+
+  return Promise.all([...folders, ...files]);
 }
 
+
 /**
- * Deletes a file from Firebase Storage.
- * @param fileName The name of the file to delete.
- * @param dbKey The key of the storage to use.
+ * Deletes a file or folder from Firebase Storage.
+ * @param itemPath The full path of the item to delete.
+ * @param isFolder Whether the item is a folder.
  */
-export async function deleteFile(fileName: string, dbKey: DbKey): Promise<void> {
-  const selectedStorage = storages[dbKey];
-  const fileRef = storageRef(selectedStorage, `uploads/${fileName}`);
-  try {
-    await deleteObject(fileRef);
-  } catch (error) {
-    console.error("Delete failed:", error);
-    throw new Error("Could not delete the file.");
+export async function deleteItem(itemPath: string, isFolder: boolean): Promise<void> {
+  const fullPath = `${FILE_STORAGE_ROOT}${itemPath}`;
+  if (isFolder) {
+    // To delete a "folder", we list all items and prefixes inside it and delete them recursively.
+    const listRef = storageRef(storage1, fullPath);
+    const res = await listAll(listRef);
+    const deletePromises = res.items.map(item => deleteObject(item));
+    await Promise.all(deletePromises);
+     const deleteFolderPromises = res.prefixes.map(prefix => deleteItem(prefix.fullPath.replace(FILE_STORAGE_ROOT, ''), true));
+    await Promise.all(deleteFolderPromises);
+    // Delete the placeholder if it exists
+    const placeholderRef = storageRef(storage1, `${fullPath}/.placeholder`);
+    try {
+        await deleteObject(placeholderRef);
+    } catch(e) {
+        // ignore if placeholder doesn't exist
+    }
+
+  } else {
+    const fileRef = storageRef(storage1, fullPath);
+    try {
+      await deleteObject(fileRef);
+    } catch (error) {
+      console.error("Delete failed:", error);
+      throw new Error("Could not delete the file.");
+    }
   }
+}
+
+
+/**
+ * Creates a "folder" by uploading a placeholder file.
+ * @param path The path where the folder should be created.
+ * @param folderName The name of the new folder.
+ */
+export async function createFolder(path: string, folderName: string): Promise<void> {
+    const folderPath = `${FILE_STORAGE_ROOT}${path}${folderName}/.placeholder`;
+    const folderRef = storageRef(storage1, folderPath);
+    try {
+        await uploadString(folderRef, '');
+    } catch (error) {
+        console.error("Folder creation failed:", error);
+        throw new Error("Could not create the folder.");
+    }
 }

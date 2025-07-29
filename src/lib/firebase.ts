@@ -7,14 +7,15 @@ import { getStorage } from "firebase/storage";
 const firebaseConfig1 = {
   // Replace with your first database URL
   databaseURL: "https://monsterfusion-c0e4e-default-rtdb.firebaseio.com",
-  storageBucket: "firebase-connector-aj1zy.firebasestorage.app",
+  storageBucket: "monsterfusion-c0e4e.firebasestorage.app",
 };
 
 // --- Configuration for the second database ---
 const firebaseConfig2 = {
   // Replace with your second database URL
   databaseURL: "https://monster-fusion-ios-default-rtdb.firebaseio.com",
-  storageBucket: "firebase-connector-aj1zy.firebasestorage.app",
+  // Using the same storage bucket for both as per user request for file manager
+  storageBucket: "monsterfusion-c0e4e.firebasestorage.app",
 };
 
 // Initialize the Firebase apps. We give them unique names to avoid conflicts.

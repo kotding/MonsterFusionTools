@@ -10,37 +10,53 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { listFiles, uploadFile, deleteFile } from "@/lib/firebase-service";
-import type { StoredFile, DbKey } from "@/types";
-import { UploadCloud, File, Trash2, Download, Copy, Loader2, RefreshCw } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { listFiles, uploadFile, deleteItem, createFolder } from "@/lib/firebase-service";
+import type { StoredFile } from "@/types";
+import { UploadCloud, File, Trash2, Download, Copy, Loader2, RefreshCw, Folder, FolderPlus, ChevronRight } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 
 export function FileManager() {
-  const [selectedDb, setSelectedDb] = useState<DbKey>("db1");
-  const [files, setFiles] = useState<StoredFile[]>([]);
+  const [currentPath, setCurrentPath] = useState("");
+  const [items, setItems] = useState<StoredFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isDeleting, startDeleteTransition] = useTransition();
   const [dragActive, setDragActive] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [isCreateFolderOpen, setCreateFolderOpen] = useState(false);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchFiles = useCallback(async (dbKey: DbKey) => {
+  const fetchFiles = useCallback(async (path: string) => {
     setIsLoading(true);
     try {
-      const fetchedFiles = await listFiles(dbKey);
-      setFiles(fetchedFiles.sort((a,b) => new Date(b.created).getTime() - new Date(a.created).getTime()));
+      const fetchedItems = await listFiles(path);
+      const sortedItems = fetchedItems.sort((a, b) => {
+        if (a.isFolder && !b.isFolder) return -1;
+        if (!a.isFolder && b.isFolder) return 1;
+        return a.name.localeCompare(b.name);
+      });
+      setItems(sortedItems);
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Error fetching files",
-        description: `Could not retrieve file list from ${dbKey}.`,
+        description: `Could not retrieve file list from ${path}.`,
       });
     } finally {
       setIsLoading(false);
@@ -48,8 +64,8 @@ export function FileManager() {
   }, [toast]);
 
   useEffect(() => {
-    fetchFiles(selectedDb);
-  }, [selectedDb, fetchFiles]);
+    fetchFiles(currentPath);
+  }, [currentPath, fetchFiles]);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -84,13 +100,13 @@ export function FileManager() {
     setUploadProgress(0);
 
     try {
-      await uploadFile(file, selectedDb, setUploadProgress);
+      await uploadFile(file, currentPath, setUploadProgress);
       toast({
         title: "Upload Successful",
-        description: `File "${file.name}" has been uploaded to ${selectedDb}.`,
+        description: `File "${file.name}" has been uploaded.`,
         className: "bg-green-500 text-white",
       });
-      fetchFiles(selectedDb); // Refresh the list
+      fetchFiles(currentPath); // Refresh the list
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -99,7 +115,6 @@ export function FileManager() {
       });
     } finally {
       setIsUploading(false);
-      // Reset file input
       if(fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -110,25 +125,41 @@ export function FileManager() {
     fileInputRef.current?.click();
   };
 
-  const handleDeleteFile = (fileName: string) => {
+  const handleDelete = (item: StoredFile) => {
       startDeleteTransition(async () => {
         try {
-            await deleteFile(fileName, selectedDb);
+            await deleteItem(item.path, item.isFolder);
             toast({
-                title: "File Deleted",
-                description: `"${fileName}" has been successfully deleted.`,
+                title: "Item Deleted",
+                description: `"${item.name}" has been successfully deleted.`,
                 className: "bg-green-500 text-white",
             });
-            fetchFiles(selectedDb); // Refresh list
+            fetchFiles(currentPath); // Refresh list
         } catch (error: any) {
             toast({
                 variant: "destructive",
                 title: "Deletion Failed",
-                description: error.message || "Could not delete the file.",
+                description: error.message || `Could not delete "${item.name}".`,
             });
         }
       });
   };
+  
+  const handleCreateFolder = async () => {
+      if (!newFolderName) {
+          toast({ variant: "destructive", title: "Folder name cannot be empty." });
+          return;
+      }
+      try {
+          await createFolder(currentPath, newFolderName);
+          toast({ title: "Folder Created", description: `Folder "${newFolderName}" created.`, className: "bg-green-500 text-white" });
+          setNewFolderName("");
+          setCreateFolderOpen(false);
+          fetchFiles(currentPath);
+      } catch (error: any) {
+          toast({ variant: "destructive", title: "Folder creation failed", description: error.message });
+      }
+  }
 
   const copyToClipboard = (url: string) => {
     navigator.clipboard.writeText(url);
@@ -143,142 +174,164 @@ export function FileManager() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
+  const Breadcrumbs = () => (
+    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <button onClick={() => setCurrentPath("")} className="hover:text-primary">FileStorage</button>
+        {currentPath.split('/').filter(Boolean).map((part, i) => {
+            const path = currentPath.split('/').slice(0, i + 1).join('/') + '/';
+            return (
+                <React.Fragment key={i}>
+                    <ChevronRight className="h-4 w-4" />
+                    <button onClick={() => setCurrentPath(path)} className="hover:text-primary">{part}</button>
+                </React.Fragment>
+            )
+        })}
+    </div>
+  );
+
   return (
     <div 
         className={cn(
-            "relative space-y-6 transition-colors rounded-lg",
-            dragActive && "bg-primary/10 border-2 border-dashed border-primary"
+            "relative flex h-full flex-col space-y-4 rounded-lg border p-4 transition-colors",
+            dragActive && "bg-primary/10"
         )}
         onDragEnter={handleDrag}
         onDragOver={handleDrag}
         onDragLeave={handleDrag}
         onDrop={handleDrop}
     >
-      <input
-        type="file"
-        ref={fileInputRef}
-        className="hidden"
-        onChange={handleFileChange}
-        disabled={isUploading}
-      />
+      <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} disabled={isUploading} />
+      
       {dragActive && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none">
-            <UploadCloud className="w-16 h-16 text-primary" />
+        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-primary bg-background/80">
+            <UploadCloud className="h-16 w-16 text-primary" />
             <p className="mt-4 text-lg font-semibold text-primary">Drop file to upload</p>
         </div>
       )}
       
        {isUploading && (
         <div className="fixed inset-x-0 bottom-0 z-50 p-4">
-            <div className="max-w-xl mx-auto space-y-2 bg-background border rounded-lg shadow-2xl p-4">
-                <p className="text-sm font-medium text-center">Uploading...</p>
+            <div className="mx-auto max-w-xl space-y-2 rounded-lg border bg-background p-4 shadow-2xl">
+                <p className="text-center text-sm font-medium">Uploading...</p>
                 <Progress value={uploadProgress} className="w-full" />
             </div>
         </div>
       )}
-
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle>Stored Files</CardTitle>
-             <div className="flex items-center gap-2">
-                <Select onValueChange={(value) => setSelectedDb(value as DbKey)} defaultValue={selectedDb}>
-                <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Select a storage" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="db1">Storage 1 (Android)</SelectItem>
-                    <SelectItem value="db2">Storage 2 (iOS)</SelectItem>
-                </SelectContent>
-                </Select>
-                <Button variant="outline" size="icon" onClick={() => fetchFiles(selectedDb)} disabled={isLoading}>
-                    <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                </Button>
-                <Button onClick={handleUploadButtonClick} disabled={isUploading}>
-                    <UploadCloud className="mr-2 h-4 w-4" />
-                    Upload File
-                </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-            <div className="rounded-md border">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                        <TableHead className="w-[64px]">Icon</TableHead>
-                        <TableHead>File Name</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Size</TableHead>
-                        <TableHead>Date Added</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {isLoading ? (
-                            <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center">
-                                    <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
-                                </TableCell>
-                            </TableRow>
-                        ) : files.length > 0 ? (
-                           files.map((file) => (
-                            <TableRow key={file.name}>
-                                <TableCell>
-                                    <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-muted">
-                                        <File className="h-5 w-5 text-muted-foreground" />
-                                    </div>
-                                </TableCell>
-                                <TableCell className="font-medium">{file.name}</TableCell>
-                                <TableCell>{file.type}</TableCell>
-                                <TableCell>{formatFileSize(file.size)}</TableCell>
-                                <TableCell>{new Date(file.created).toLocaleDateString()}</TableCell>
-                                <TableCell className="text-right">
-                                <Button variant="ghost" size="icon" asChild>
-                                  <a href={file.url} target="_blank" rel="noopener noreferrer">
-                                    <Download className="h-4 w-4" />
-                                  </a>
-                                </Button>
-                                <Button variant="ghost" size="icon" onClick={() => copyToClipboard(file.url)}>
-                                  <Copy className="h-4 w-4" />
-                                </Button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        This action cannot be undone. This will permanently delete the file "{file.name}".
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleDeleteFile(file.name)} disabled={isDeleting}>
-                                        {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Delete
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                                </TableCell>
-                            </TableRow>
-                           ))
-                        ) : (
-                            <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center">
-                                No files found in this storage.
-                                </TableCell>
-                            </TableRow>
+      
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <Breadcrumbs />
+        <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={() => fetchFiles(currentPath)} disabled={isLoading}>
+                <RefreshCw className={cn("h-4 w-4", isLoading && 'animate-spin')} />
+            </Button>
+            <Dialog open={isCreateFolderOpen} onOpenChange={setCreateFolderOpen}>
+                <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                        <FolderPlus className="mr-2 h-4 w-4" /> Create Folder
+                    </Button>
+                </DialogTrigger>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Create New Folder</DialogTitle>
+                        <DialogDescription>Enter a name for your new folder in the current directory.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                       <div className="grid grid-cols-4 items-center gap-4">
+                         <Label htmlFor="folder-name" className="text-right">Name</Label>
+                         <Input id="folder-name" value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} className="col-span-3" />
+                       </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setCreateFolderOpen(false)}>Cancel</Button>
+                        <Button type="submit" onClick={handleCreateFolder}>Create</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <Button onClick={handleUploadButtonClick} disabled={isUploading} size="sm">
+                <UploadCloud className="mr-2 h-4 w-4" />
+                Upload File
+            </Button>
+        </div>
+      </div>
+      
+      <div className="relative flex-1 overflow-auto rounded-md border">
+        <Table>
+            <TableHeader>
+                <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Size</TableHead>
+                <TableHead>Date Added</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {isLoading ? (
+                    <TableRow>
+                        <TableCell colSpan={5} className="h-24 text-center">
+                            <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
+                        </TableCell>
+                    </TableRow>
+                ) : items.length > 0 ? (
+                   items.map((item) => (
+                    <TableRow key={item.path} onDoubleClick={() => item.isFolder && setCurrentPath(item.path)} className={cn(item.isFolder && "cursor-pointer")}>
+                        <TableCell className="font-medium">
+                           <div className="flex items-center gap-2">
+                            {item.isFolder ? <Folder className="h-5 w-5 text-yellow-500" /> : <File className="h-5 w-5 text-muted-foreground" />}
+                            <span>{item.name}</span>
+                           </div>
+                        </TableCell>
+                        <TableCell>{item.isFolder ? 'Folder' : item.type}</TableCell>
+                        <TableCell>{item.isFolder ? '--' : formatFileSize(item.size)}</TableCell>
+                        <TableCell>{new Date(item.created).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-right">
+                        {!item.isFolder && (
+                            <>
+                            <Button variant="ghost" size="icon" asChild>
+                              <a href={item.url} target="_blank" rel="noopener noreferrer">
+                                <Download className="h-4 w-4" />
+                              </a>
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => copyToClipboard(item.url)}>
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                            </>
                         )}
-                    </TableBody>
-                </Table>
-            </div>
-        </CardContent>
-      </Card>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete "{item.name}". This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(item)} disabled={isDeleting}>
+                                {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                        </TableCell>
+                    </TableRow>
+                   ))
+                ) : (
+                    <TableRow>
+                        <TableCell colSpan={5} className="h-24 text-center">
+                        This folder is empty.
+                        </TableCell>
+                    </TableRow>
+                )}
+            </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

@@ -77,9 +77,11 @@ export type BannedAccounts = {
   [uid: string]: "Banned";
 };
 
-// Represents a file stored in Firebase Storage
+// Represents a file or folder stored in Firebase Storage
 export type StoredFile = {
     name: string;
+    path: string;
+    isFolder: boolean;
     url: string;
     size: number;
     type: string;
