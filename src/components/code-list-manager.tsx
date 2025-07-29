@@ -166,7 +166,7 @@ function RewardFields({
         />
       )}
       {rewardType === "PURCHASE_PACK" && (
-        <div className="grid grid-cols-2 gap-2 rounded-md border bg-muted/50 p-2">
+        <div className="grid grid-cols-2 items-start gap-2 rounded-md border bg-muted/50 p-2">
            <FormField
               control={control}
               name={`${prefix}.${index}.iapKey`}
@@ -180,16 +180,22 @@ function RewardFields({
                 </FormItem>
               )}
             />
-             <Select onValueChange={(value) => form.setValue(`${prefix}.${index}.iapKey`, value)}>
-                <SelectTrigger>
-                    <SelectValue placeholder="Or select a pack" />
-                </SelectTrigger>
-                <SelectContent>
-                    {IAP_PACKS.map(pack => (
-                        <SelectItem key={pack} value={pack}>{pack}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+            <FormItem>
+               <FormLabel className="sr-only">Or select a pack</FormLabel>
+               <Select onValueChange={(value) => form.setValue(`${prefix}.${index}.iapKey`, value)}>
+                  <FormControl>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Or select a pack" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                      {IAP_PACKS.map(pack => (
+                          <SelectItem key={pack} value={pack}>{pack}</SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
         </div>
       )}
     </div>
