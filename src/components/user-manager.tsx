@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useTransition } from "react";
+import { useState, useEffect, useMemo, useTransition, FormEvent } from "react";
 import Image from "next/image";
 import {
   Table,
@@ -49,6 +49,7 @@ export function UserManager({ dbKey }: UserManagerProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isActionPending, startActionTransition] = useTransition();
   
+  const [inputValue, setInputValue] = useState("");
   const [filterText, setFilterText] = useState("");
   const [isFiltering, startFilteringTransition] = useTransition();
   
@@ -107,12 +108,14 @@ export function UserManager({ dbKey }: UserManagerProps) {
       }
     });
   };
-
-  const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  
+  const handleSearchSubmit = (e: FormEvent) => {
+    e.preventDefault();
     startFilteringTransition(() => {
-        setFilterText(e.target.value);
+        setFilterText(inputValue);
     });
   };
+
 
   const filteredAndSortedUsers = useMemo(() => {
     const usersWithBanStatus = users.map((user) => ({
@@ -151,15 +154,15 @@ export function UserManager({ dbKey }: UserManagerProps) {
   return (
     <TooltipProvider>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
-        <div className="relative">
+        <form onSubmit={handleSearchSubmit} className="relative">
              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
              <Input
-                placeholder="Search by Username or UID..."
-                value={filterText}
-                onChange={handleFilterChange}
+                placeholder="Search and press Enter..."
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
                 className="max-w-xs pl-10"
              />
-        </div>
+        </form>
         <div className="flex items-center gap-2">
            <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
            <Select onValueChange={(value) => setSortKey(value as SortKey)} defaultValue="default">
