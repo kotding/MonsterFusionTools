@@ -1,3 +1,4 @@
+
 import { ref, set, get, remove, child, DataSnapshot, Database } from "firebase/database";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, listAll, deleteObject, uploadString, getMetadata, type StorageReference, type FirebaseStorage } from "firebase/storage";
 import type { GiftCode, Reward, EditCodeFormValues, User, BannedAccounts, DbKey, StoredFile } from "@/types";
@@ -356,3 +357,5 @@ export async function createFolder(path: string, folderName: string): Promise<vo
         throw new Error("Could not create the folder.");
     }
 }
+
+    
