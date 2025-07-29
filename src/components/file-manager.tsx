@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useTransition } from "react";
+import { useState, useEffect, useCallback, useTransition, useRef } from "react";
 import {
   Table,
   TableBody,
@@ -29,6 +29,7 @@ export function FileManager() {
   const [isDeleting, startDeleteTransition] = useTransition();
   const [dragActive, setDragActive] = useState(false);
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchFiles = useCallback(async (dbKey: DbKey) => {
     setIsLoading(true);
@@ -98,7 +99,15 @@ export function FileManager() {
       });
     } finally {
       setIsUploading(false);
+      // Reset file input
+      if(fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
+  };
+  
+  const handleUploadButtonClick = () => {
+    fileInputRef.current?.click();
   };
 
   const handleDeleteFile = (fileName: string) => {
@@ -135,59 +144,46 @@ export function FileManager() {
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Upload New File</CardTitle>
-          <CardDescription>Drag and drop a file or click to select one.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div
-            onDragEnter={handleDrag}
-            className={cn(
-                "relative flex flex-col items-center justify-center p-10 border-2 border-dashed rounded-lg transition-colors",
-                dragActive ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
-            )}
-          >
-            <input
-              type="file"
-              id="file-upload"
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              onChange={handleFileChange}
-              disabled={isUploading}
-            />
-            <label htmlFor="file-upload" className="flex flex-col items-center justify-center text-center cursor-pointer">
-              <UploadCloud className="w-12 h-12 text-muted-foreground" />
-              <p className="mt-2 text-sm text-muted-foreground">
-                <span className="font-semibold text-primary">Click to upload</span> or drag and drop
-              </p>
-              <p className="text-xs text-muted-foreground">Any single file</p>
-            </label>
-            {dragActive && (
-              <div
-                className="absolute inset-0 w-full h-full"
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-              ></div>
-            )}
-          </div>
-          {isUploading && (
-            <div className="mt-4 space-y-2">
+    <div 
+        className={cn(
+            "relative space-y-6 transition-colors rounded-lg",
+            dragActive && "bg-primary/10 border-2 border-dashed border-primary"
+        )}
+        onDragEnter={handleDrag}
+        onDragOver={handleDrag}
+        onDragLeave={handleDrag}
+        onDrop={handleDrop}
+    >
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        onChange={handleFileChange}
+        disabled={isUploading}
+      />
+      {dragActive && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none">
+            <UploadCloud className="w-16 h-16 text-primary" />
+            <p className="mt-4 text-lg font-semibold text-primary">Drop file to upload</p>
+        </div>
+      )}
+      
+       {isUploading && (
+        <div className="fixed inset-x-0 bottom-0 z-50 p-4">
+            <div className="max-w-xl mx-auto space-y-2 bg-background border rounded-lg shadow-2xl p-4">
                 <p className="text-sm font-medium text-center">Uploading...</p>
                 <Progress value={uploadProgress} className="w-full" />
             </div>
-          )}
-        </CardContent>
-      </Card>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle>Stored Files</CardTitle>
-             <div className="flex items-center gap-4">
+             <div className="flex items-center gap-2">
                 <Select onValueChange={(value) => setSelectedDb(value as DbKey)} defaultValue={selectedDb}>
-                <SelectTrigger className="w-[220px]">
+                <SelectTrigger className="w-[200px]">
                     <SelectValue placeholder="Select a storage" />
                 </SelectTrigger>
                 <SelectContent>
@@ -197,6 +193,10 @@ export function FileManager() {
                 </Select>
                 <Button variant="outline" size="icon" onClick={() => fetchFiles(selectedDb)} disabled={isLoading}>
                     <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                </Button>
+                <Button onClick={handleUploadButtonClick} disabled={isUploading}>
+                    <UploadCloud className="mr-2 h-4 w-4" />
+                    Upload File
                 </Button>
             </div>
           </div>
