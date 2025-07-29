@@ -83,11 +83,13 @@ export async function addGiftCode(newCodeData: Omit<GiftCode, 'id'>): Promise<Gi
 }
 
 /**
- * Fetches all gift codes from the first database.
+ * Fetches all gift codes from the specified database.
+ * @param dbKey The key of the database to fetch from ('db1' or 'db2').
  * @returns A promise that resolves to an array of GiftCode objects.
  */
-export async function getAllGiftCodes(): Promise<GiftCode[]> {
-    const codesRef = ref(db1, 'RedeemCodes');
+export async function getAllGiftCodes(dbKey: DbKey): Promise<GiftCode[]> {
+    const selectedDb = dbs[dbKey];
+    const codesRef = ref(selectedDb, 'RedeemCodes');
     const snapshot = await get(codesRef);
     if (snapshot.exists()) {
         const codesData = snapshot.val();
@@ -101,38 +103,36 @@ export async function getAllGiftCodes(): Promise<GiftCode[]> {
 }
 
 /**
- * Deletes a gift code from both databases.
+ * Deletes a gift code from the specified database.
  * @param codeId The ID of the code to delete.
+ * @param dbKey The key of the database to update.
  */
-export async function deleteGiftCode(codeId: string): Promise<void> {
-    const codeRef1 = ref(db1, `RedeemCodes/${codeId}`);
-    const codeRef2 = ref(db2, `RedeemCodes/${codeId}`);
-
+export async function deleteGiftCode(codeId: string, dbKey: DbKey): Promise<void> {
+    const selectedDb = dbs[dbKey];
+    const codeRef = ref(selectedDb, `RedeemCodes/${codeId}`);
     try {
-        await Promise.all([
-            remove(codeRef1),
-            remove(codeRef2)
-        ]);
+        await remove(codeRef);
     } catch (error) {
-        console.error("Failed to delete from one or more databases:", error);
-        throw new Error("An error occurred while deleting the code.");
+        console.error(`Failed to delete from ${dbKey}:`, error);
+        throw new Error(`An error occurred while deleting the code from ${dbKey}.`);
     }
 }
 
 /**
- * Updates a gift code in both databases.
+ * Updates a gift code in the specified database.
  * @param codeId The ID of the code to update.
  * @param updatedData The data to update.
+ * @param dbKey The key of the database to update.
  * @returns The updated gift code object.
  */
-export async function updateGiftCode(codeId: string, updatedData: EditCodeFormValues): Promise<GiftCode> {
-    const codeRef1 = ref(db1, `RedeemCodes/${codeId}`);
-    const codeRef2 = ref(db2, `RedeemCodes/${codeId}`);
+export async function updateGiftCode(codeId: string, updatedData: EditCodeFormValues, dbKey: DbKey): Promise<GiftCode> {
+    const selectedDb = dbs[dbKey];
+    const codeRef = ref(selectedDb, `RedeemCodes/${codeId}`);
 
     // Fetch the existing code to merge data
-    const snapshot = await get(codeRef1);
+    const snapshot = await get(codeRef);
     if (!snapshot.exists()) {
-        throw new Error(`Code "${codeId}" not found.`);
+        throw new Error(`Code "${codeId}" not found in ${dbKey}.`);
     }
     const existingCode = snapshot.val() as GiftCode;
 
@@ -151,14 +151,11 @@ export async function updateGiftCode(codeId: string, updatedData: EditCodeFormVa
     };
 
     try {
-        await Promise.all([
-            set(codeRef1, dataToSave),
-            set(codeRef2, dataToSave)
-        ]);
+        await set(codeRef, dataToSave);
         return { ...dataToSave, id: codeId };
     } catch (error) {
-        console.error("Failed to update one or more databases:", error);
-        throw new Error("An error occurred while updating the code.");
+        console.error(`Failed to update ${dbKey}:`, error);
+        throw new Error(`An error occurred while updating the code in ${dbKey}.`);
     }
 }
 

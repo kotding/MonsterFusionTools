@@ -37,7 +37,7 @@ import {
   deleteGiftCode,
   updateGiftCode,
 } from "@/lib/firebase-service";
-import type { GiftCode, EditCodeFormValues } from "@/types";
+import type { GiftCode, EditCodeFormValues, DbKey } from "@/types";
 import { Loader2, Trash2, FilePenLine, PlusCircle, Trash } from "lucide-react";
 import {
   Form,
@@ -205,9 +205,11 @@ function RewardFields({
 function EditCodeForm({
   code,
   onClose,
+  dbKey,
 }: {
   code: GiftCode;
   onClose: () => void;
+  dbKey: DbKey;
 }) {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
@@ -229,10 +231,10 @@ function EditCodeForm({
   const handleUpdateCode = (values: EditCodeFormValues) => {
     startTransition(async () => {
       try {
-        await updateGiftCode(code.id, values);
+        await updateGiftCode(code.id, values, dbKey);
         toast({
           title: "Success!",
-          description: `Code "${code.code}" updated successfully.`,
+          description: `Code "${code.code}" updated successfully on ${dbKey}.`,
           className: "bg-green-500 text-white",
         });
         onClose();
@@ -412,7 +414,7 @@ function EditCodeForm({
   );
 }
 
-export function CodeListManager() {
+export function CodeListManager({ dbKey }: { dbKey: DbKey }) {
   const [codes, setCodes] = useState<GiftCode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, startDeleteTransition] = useTransition();
@@ -425,13 +427,13 @@ export function CodeListManager() {
   const fetchCodes = async () => {
     setIsLoading(true);
     try {
-      const fetchedCodes = await getAllGiftCodes();
+      const fetchedCodes = await getAllGiftCodes(dbKey);
       setCodes(fetchedCodes.sort((a, b) => a.code.localeCompare(b.code)));
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Error fetching codes",
-        description: "Could not retrieve the list of gift codes.",
+        description: `Could not retrieve gift codes from ${dbKey}.`,
       });
     } finally {
       setIsLoading(false);
@@ -440,15 +442,15 @@ export function CodeListManager() {
 
   useEffect(() => {
     fetchCodes();
-  }, []);
+  }, [dbKey]);
 
   const handleDelete = (codeId: string) => {
     startDeleteTransition(async () => {
       try {
-        await deleteGiftCode(codeId);
+        await deleteGiftCode(codeId, dbKey);
         toast({
           title: "Code Deleted",
-          description: `Code "${codeId}" has been successfully deleted.`,
+          description: `Code has been successfully deleted from ${dbKey}.`,
           className: "bg-green-500 text-white",
         });
         fetchCodes(); // Refresh the list
@@ -456,7 +458,7 @@ export function CodeListManager() {
         toast({
           variant: "destructive",
           title: "Deletion Failed",
-          description: error.message || `Could not delete code "${codeId}".`,
+          description: error.message || `Could not delete code from ${dbKey}.`,
         });
       }
     });
@@ -482,12 +484,12 @@ export function CodeListManager() {
             return;
         }
 
-        const promises = codesToDelete.map(id => deleteGiftCode(id));
+        const promises = codesToDelete.map(id => deleteGiftCode(id, dbKey));
         try {
             await Promise.all(promises);
             toast({
                 title: "Bulk Delete Successful",
-                description: `${codesToDelete.length} codes have been deleted.`,
+                description: `${codesToDelete.length} codes have been deleted from ${dbKey}.`,
                 className: "bg-green-500 text-white",
             });
             fetchCodes(); // Refresh
@@ -495,7 +497,7 @@ export function CodeListManager() {
             toast({
                 variant: "destructive",
                 title: "Bulk Delete Failed",
-                description: "An error occurred while deleting codes.",
+                description: `An error occurred while deleting codes from ${dbKey}.`,
             });
         }
     });
@@ -644,7 +646,7 @@ export function CodeListManager() {
       <Dialog open={!!editingCode} onOpenChange={(open) => !open && handleEditClose()}>
         <DialogContent className="max-w-3xl">
           {editingCode && (
-            <EditCodeForm code={editingCode} onClose={handleEditClose} />
+            <EditCodeForm code={editingCode} onClose={handleEditClose} dbKey={dbKey} />
           )}
         </DialogContent>
       </Dialog>
