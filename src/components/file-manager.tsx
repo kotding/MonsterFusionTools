@@ -147,6 +147,7 @@ export function FileManager() {
 
   const handleDelete = (itemToDelete: StoredFile) => {
       startDeleteTransition(async () => {
+        const originalItems = [...items];
         // Optimistically update UI
         setItems(prevItems => prevItems.filter(item => item.path !== itemToDelete.path));
         
@@ -165,7 +166,7 @@ export function FileManager() {
                 description: error.message || `Could not delete "${itemToDelete.name}".`,
             });
             // Revert UI on failure
-            fetchFiles(currentPath);
+            setItems(originalItems);
         }
       });
   };
