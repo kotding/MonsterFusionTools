@@ -114,8 +114,9 @@ export function UserManager({ dbKey }: UserManagerProps) {
     if (filterText) {
       filtered = usersWithBanStatus.filter(
         (user) =>
-          user.UserName.toLowerCase().includes(filterText.toLowerCase()) ||
-          user.UID.toLowerCase().includes(filterText.toLowerCase())
+          (user.UserName &&
+            user.UserName.toLowerCase().includes(filterText.toLowerCase())) ||
+          (user.UID && user.UID.toLowerCase().includes(filterText.toLowerCase()))
       );
     }
 
