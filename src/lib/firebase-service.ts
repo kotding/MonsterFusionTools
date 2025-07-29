@@ -246,12 +246,11 @@ export async function uploadFile(
   path: string,
   onProgress: (progress: number) => void
 ): Promise<string> {
-  // Combine the root, the current path, and the file name.
-  // This logic correctly handles if path is empty (root) or a subfolder.
-  const basePath = [FILE_STORAGE_ROOT, path].filter(Boolean).join('');
-  const fullPath = `${basePath}${file.name}`;
+  // Construct the base path, ensuring it ends with a slash if it's not empty
+  const basePath = path ? `${path.endsWith('/') ? path : path + '/'}` : '';
+  const fullStoragePath = `${FILE_STORAGE_ROOT}${basePath}${file.name}`;
   
-  const fileRef = storageRef(storage1, fullPath);
+  const fileRef = storageRef(storage1, fullStoragePath);
   const uploadTask = uploadBytesResumable(fileRef, file);
 
   return new Promise((resolve, reject) => {
