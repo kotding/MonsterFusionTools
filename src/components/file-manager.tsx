@@ -115,8 +115,6 @@ export function FileManager() {
     const uploadPromises = [];
     for (const file of fileList) {
         uploadPromises.push(uploadFile(file, currentPath, (progress) => {
-            // For multi-file uploads, progress can be averaged, or just show for the last file.
-            // Simple approach: show overall progress if possible, or just the latest.
             setUploadProgress(progress);
         }));
     }
@@ -147,22 +145,27 @@ export function FileManager() {
     fileInputRef.current?.click();
   };
 
-  const handleDelete = (item: StoredFile) => {
+  const handleDelete = (itemToDelete: StoredFile) => {
       startDeleteTransition(async () => {
+        // Optimistically update UI
+        setItems(prevItems => prevItems.filter(item => item.path !== itemToDelete.path));
+        
         try {
-            await deleteItem(item.path, item.isFolder);
+            await deleteItem(itemToDelete.path, itemToDelete.isFolder);
             toast({
                 title: "Item Deleted",
-                description: `"${item.name}" has been successfully deleted.`,
+                description: `"${itemToDelete.name}" has been successfully deleted.`,
                 className: "bg-green-500 text-white",
             });
-            fetchFiles(currentPath); // Refresh list
+            // No need to call fetchFiles, UI is already updated.
         } catch (error: any) {
             toast({
                 variant: "destructive",
                 title: "Deletion Failed",
-                description: error.message || `Could not delete "${item.name}".`,
+                description: error.message || `Could not delete "${itemToDelete.name}".`,
             });
+            // Revert UI on failure
+            fetchFiles(currentPath);
         }
       });
   };
