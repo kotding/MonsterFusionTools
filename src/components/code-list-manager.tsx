@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useTransition } from "react";
+import { useState, useEffect, useMemo, useTransition, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -38,7 +39,7 @@ import {
   updateGiftCode,
 } from "@/lib/firebase-service";
 import type { GiftCode, EditCodeFormValues, DbKey } from "@/types";
-import { Loader2, Trash2, FilePenLine, PlusCircle, Trash } from "lucide-react";
+import { Loader2, Trash2, FilePenLine, PlusCircle, Trash, RefreshCw } from "lucide-react";
 import {
   Form,
   FormControl,
@@ -414,8 +415,9 @@ function EditCodeForm({
   );
 }
 
-export function CodeListManager({ dbKey }: { dbKey: DbKey }) {
-  const [codes, setCodes] = useState<GiftCode[]>([]);
+export function CodeListManager() {
+  const [selectedDb, setSelectedDb] = useState<DbKey>("db1");
+  const [cachedData, setCachedData] = useState<Record<DbKey, GiftCode[]>>({ db1: [], db2: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, startDeleteTransition] = useTransition();
   const [filterText, setFilterText] = useState("");
@@ -424,11 +426,20 @@ export function CodeListManager({ dbKey }: { dbKey: DbKey }) {
   const [editingCode, setEditingCode] = useState<GiftCode | null>(null);
   const { toast } = useToast();
 
-  const fetchCodes = async () => {
+  const codes = useMemo(() => cachedData[selectedDb] || [], [cachedData, selectedDb]);
+
+  const fetchCodes = useCallback(async (dbKey: DbKey, forceRefresh = false) => {
+    if (!forceRefresh && cachedData[dbKey].length > 0) {
+      // Data already cached, no need to fetch again unless forced
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const fetchedCodes = await getAllGiftCodes(dbKey);
-      setCodes(fetchedCodes.sort((a, b) => a.code.localeCompare(b.code)));
+      const sortedCodes = fetchedCodes.sort((a, b) => a.code.localeCompare(b.code));
+      setCachedData(prev => ({ ...prev, [dbKey]: sortedCodes }));
     } catch (error) {
       toast({
         variant: "destructive",
@@ -438,27 +449,31 @@ export function CodeListManager({ dbKey }: { dbKey: DbKey }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [cachedData, toast]);
 
   useEffect(() => {
-    fetchCodes();
-  }, [dbKey]);
+    fetchCodes(selectedDb);
+  }, [selectedDb, fetchCodes]);
+
+  const handleRefresh = () => {
+    fetchCodes(selectedDb, true);
+  };
 
   const handleDelete = (codeId: string) => {
     startDeleteTransition(async () => {
       try {
-        await deleteGiftCode(codeId, dbKey);
+        await deleteGiftCode(codeId, selectedDb);
         toast({
           title: "Code Deleted",
-          description: `Code has been successfully deleted from ${dbKey}.`,
+          description: `Code has been successfully deleted from ${selectedDb}.`,
           className: "bg-green-500 text-white",
         });
-        fetchCodes(); // Refresh the list
+        fetchCodes(selectedDb, true); // Force refresh the list
       } catch (error: any) {
         toast({
           variant: "destructive",
           title: "Deletion Failed",
-          description: error.message || `Could not delete code from ${dbKey}.`,
+          description: error.message || `Could not delete code from ${selectedDb}.`,
         });
       }
     });
@@ -484,20 +499,20 @@ export function CodeListManager({ dbKey }: { dbKey: DbKey }) {
             return;
         }
 
-        const promises = codesToDelete.map(id => deleteGiftCode(id, dbKey));
+        const promises = codesToDelete.map(id => deleteGiftCode(id, selectedDb));
         try {
             await Promise.all(promises);
             toast({
                 title: "Bulk Delete Successful",
-                description: `${codesToDelete.length} codes have been deleted from ${dbKey}.`,
+                description: `${codesToDelete.length} codes have been deleted from ${selectedDb}.`,
                 className: "bg-green-500 text-white",
             });
-            fetchCodes(); // Refresh
+            fetchCodes(selectedDb, true); // Refresh
         } catch (error: any) {
             toast({
                 variant: "destructive",
                 title: "Bulk Delete Failed",
-                description: `An error occurred while deleting codes from ${dbKey}.`,
+                description: `An error occurred while deleting codes from ${selectedDb}.`,
             });
         }
     });
@@ -505,151 +520,174 @@ export function CodeListManager({ dbKey }: { dbKey: DbKey }) {
 
   const handleEditClose = () => {
     setEditingCode(null);
-    fetchCodes(); // Refresh list after editing
+    fetchCodes(selectedDb, true); // Refresh list after editing
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <Input
-          placeholder="Filter codes..."
-          value={filterText}
-          onChange={(e) => setFilterText(e.target.value)}
-          className="max-w-xs"
-        />
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="showExpired"
-              checked={showExpired}
-              onCheckedChange={(checked) => setShowExpired(Boolean(checked))}
-            />
-            <label htmlFor="showExpired" className="text-sm font-medium">
-              Hết hạn
-            </label>
+    <Card className="mt-4">
+      <CardHeader>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle>Gift Code List</CardTitle>
+          <div className="flex items-center gap-4">
+            <Select onValueChange={(value) => setSelectedDb(value as DbKey)} defaultValue={selectedDb}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Select a database" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="db1">Database 1 (Android)</SelectItem>
+                <SelectItem value="db2">Database 2 (iOS)</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isLoading}>
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="showMaxed"
-              checked={showMaxed}
-              onCheckedChange={(checked) => setShowMaxed(Boolean(checked))}
-            />
-            <label htmlFor="showMaxed" className="text-sm font-medium">
-              Hết lượt nhập
-            </label>
-          </div>
-           <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm" disabled={filteredCodes.length === 0}>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Xóa ({filteredCodes.length}) mã đã lọc
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action will permanently delete {filteredCodes.length} codes. This cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeleteFiltered} disabled={isDeleting}>
-                    {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Continue
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
         </div>
-      </div>
-      <div className="rounded-md border">
-        <ScrollArea className="h-[60vh]">
-          <Table>
-            <TableHeader className="sticky top-0 bg-background">
-              <TableRow>
-                <TableHead>Code</TableHead>
-                <TableHead className="text-center">Claims</TableHead>
-                <TableHead>Expires</TableHead>
-                <TableHead>Rewards</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
-                    <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
-                  </TableCell>
-                </TableRow>
-              ) : filteredCodes.length > 0 ? (
-                filteredCodes.map((code) => (
-                  <TableRow key={code.id}>
-                    <TableCell className="font-mono">{code.code}</TableCell>
-                    <TableCell className="text-center">
-                      {code.currClaimCount} / {code.maxClaimCount}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(code.expire).toLocaleDateString()}
-                    </TableCell>
-                     <TableCell>
-                      {code.listRewards.length}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setEditingCode(code)}
-                      >
-                        <FilePenLine className="h-4 w-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently delete the code "{code.code}".
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDelete(code.id)}
-                              disabled={isDeleting}
-                            >
-                               {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </TableCell>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <Input
+              placeholder="Filter codes..."
+              value={filterText}
+              onChange={(e) => setFilterText(e.target.value)}
+              className="max-w-xs"
+            />
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="showExpired"
+                  checked={showExpired}
+                  onCheckedChange={(checked) => setShowExpired(Boolean(checked))}
+                />
+                <label htmlFor="showExpired" className="text-sm font-medium">
+                  Hết hạn
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="showMaxed"
+                  checked={showMaxed}
+                  onCheckedChange={(checked) => setShowMaxed(Boolean(checked))}
+                />
+                <label htmlFor="showMaxed" className="text-sm font-medium">
+                  Hết lượt nhập
+                </label>
+              </div>
+              <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" disabled={filteredCodes.length === 0 || isDeleting}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Xóa ({filteredCodes.length}) mã đã lọc
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action will permanently delete {filteredCodes.length} codes from {selectedDb}. This cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteFiltered} disabled={isDeleting}>
+                        {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Continue
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+            </div>
+          </div>
+          <div className="rounded-md border">
+            <ScrollArea className="h-[60vh]">
+              <Table>
+                <TableHeader className="sticky top-0 bg-background">
+                  <TableRow>
+                    <TableHead>Code</TableHead>
+                    <TableHead className="text-center">Claims</TableHead>
+                    <TableHead>Expires</TableHead>
+                    <TableHead>Rewards</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
-                    No codes found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </ScrollArea>
-      </div>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-24 text-center">
+                        <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredCodes.length > 0 ? (
+                    filteredCodes.map((code) => (
+                      <TableRow key={code.id}>
+                        <TableCell className="font-mono">{code.code}</TableCell>
+                        <TableCell className="text-center">
+                          {code.currClaimCount} / {code.maxClaimCount}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(code.expire).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          {code.listRewards.length}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingCode(code)}
+                          >
+                            <FilePenLine className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will permanently delete the code "{code.code}".
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDelete(code.id)}
+                                  disabled={isDeleting}
+                                >
+                                  {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-24 text-center">
+                        No codes found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          </div>
 
-      <Dialog open={!!editingCode} onOpenChange={(open) => !open && handleEditClose()}>
-        <DialogContent className="max-w-3xl">
-          {editingCode && (
-            <EditCodeForm code={editingCode} onClose={handleEditClose} dbKey={dbKey} />
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+          <Dialog open={!!editingCode} onOpenChange={(open) => !open && handleEditClose()}>
+            <DialogContent className="max-w-3xl">
+              {editingCode && (
+                <EditCodeForm code={editingCode} onClose={handleEditClose} dbKey={selectedDb} />
+              )}
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

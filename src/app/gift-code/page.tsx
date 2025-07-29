@@ -5,12 +5,6 @@ import { CodeListManager } from "@/components/code-list-manager";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 export default function GiftCodePage() {
   return (
@@ -55,32 +49,7 @@ export default function GiftCodePage() {
               </div>
             </TabsContent>
             <TabsContent value="list">
-              <Tabs defaultValue="db1">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="db1">Database 1 (Android)</TabsTrigger>
-                  <TabsTrigger value="db2">Database 2 (iOS)</TabsTrigger>
-                </TabsList>
-                <TabsContent value="db1">
-                  <Card className="mt-4">
-                     <CardHeader>
-                        <CardTitle>Gift Code List - Database 1</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <CodeListManager key="db1" dbKey="db1" />
-                      </CardContent>
-                  </Card>
-                </TabsContent>
-                 <TabsContent value="db2">
-                  <Card className="mt-4">
-                     <CardHeader>
-                        <CardTitle>Gift Code List - Database 2</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <CodeListManager key="db2" dbKey="db2" />
-                      </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
+              <CodeListManager />
             </TabsContent>
           </Tabs>
         </div>
