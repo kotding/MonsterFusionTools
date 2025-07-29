@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo, useTransition, useCallback } from "react";
+import { useState, useEffect, useMemo, useTransition, useCallback, useRef } from "react";
+import { FixedSizeList } from 'react-window';
 import {
   Table,
   TableBody,
@@ -66,6 +67,9 @@ import {
 } from "@/types/rewards";
 import { differenceInDays, parseISO } from "date-fns";
 import { ScrollArea } from "./ui/scroll-area";
+import { cn } from "@/lib/utils";
+
+const _listHeight = typeof window !== 'undefined' ? window.innerHeight * 0.6 : 500;
 
 function RewardFields({
   prefix,
@@ -425,6 +429,8 @@ export function CodeListManager() {
   const [showMaxed, setShowMaxed] = useState(false);
   const [editingCode, setEditingCode] = useState<GiftCode | null>(null);
   const { toast } = useToast();
+  const listRef = useRef<FixedSizeList>(null);
+
 
   const codes = useMemo(() => cachedData[selectedDb] || [], [cachedData, selectedDb]);
 
@@ -454,6 +460,12 @@ export function CodeListManager() {
   useEffect(() => {
     fetchCodes(selectedDb);
   }, [selectedDb, fetchCodes]);
+
+   useEffect(() => {
+    if (listRef.current) {
+      listRef.current.scrollTo(0);
+    }
+  }, [filterText, selectedDb]);
 
   const handleRefresh = () => {
     fetchCodes(selectedDb, true);
@@ -522,6 +534,70 @@ export function CodeListManager() {
     setEditingCode(null);
     fetchCodes(selectedDb, true); // Refresh list after editing
   };
+  
+  const ListHeader = () => (
+     <div className="flex items-center sticky top-0 bg-background z-10 border-b font-medium text-muted-foreground h-12">
+        <div className="p-4 flex-1">Code</div>
+        <div className="p-4 w-28 text-center shrink-0">Claims</div>
+        <div className="p-4 w-32 shrink-0">Expires</div>
+        <div className="p-4 w-28 text-center shrink-0">Rewards</div>
+        <div className="p-4 w-32 text-right shrink-0">Actions</div>
+    </div>
+  )
+
+  const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => {
+    const code = filteredCodes[index];
+    if (!code) return null;
+
+    return (
+        <div style={style} className="flex items-center border-b hover:bg-muted/50">
+           <div className="p-4 flex-1 font-mono min-w-0 truncate">{code.code}</div>
+           <div className="p-4 w-28 text-center shrink-0">
+              {code.currClaimCount} / {code.maxClaimCount}
+            </div>
+            <div className="p-4 w-32 shrink-0">
+              {new Date(code.expire).toLocaleDateString()}
+            </div>
+            <div className="p-4 w-28 text-center shrink-0">
+              {code.listRewards.length}
+            </div>
+            <div className="p-4 w-32 text-right shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setEditingCode(code)}
+                >
+                  <FilePenLine className="h-4 w-4" />
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete the code "{code.code}".
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleDelete(code.id)}
+                        disabled={isDeleting}
+                      >
+                        {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+           </div>
+        </div>
+    )
+  }
 
   return (
     <Card className="mt-4">
@@ -599,84 +675,32 @@ export function CodeListManager() {
                 </AlertDialog>
             </div>
           </div>
-          <div className="rounded-md border">
-            <ScrollArea className="h-[60vh]">
-              <Table>
-                <TableHeader className="sticky top-0 bg-background">
-                  <TableRow>
-                    <TableHead>Code</TableHead>
-                    <TableHead className="text-center">Claims</TableHead>
-                    <TableHead>Expires</TableHead>
-                    <TableHead>Rewards</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center">
-                        <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredCodes.length > 0 ? (
-                    filteredCodes.map((code) => (
-                      <TableRow key={code.id}>
-                        <TableCell className="font-mono">{code.code}</TableCell>
-                        <TableCell className="text-center">
-                          {code.currClaimCount} / {code.maxClaimCount}
-                        </TableCell>
-                        <TableCell>
-                          {new Date(code.expire).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          {code.listRewards.length}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setEditingCode(code)}
-                          >
-                            <FilePenLine className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will permanently delete the code "{code.code}".
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDelete(code.id)}
-                                  disabled={isDeleting}
-                                >
-                                  {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </TableCell>
-                      </TableRow>
-                    ))
+          <div className="rounded-md border h-[60vh] relative">
+             {isLoading ? (
+                <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/50 backdrop-blur-sm">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+             ) : (
+                <>
+                  <ListHeader />
+                  {filteredCodes.length > 0 ? (
+                      <FixedSizeList
+                          ref={listRef}
+                          height={_listHeight - 48} // container height minus header height
+                          itemCount={filteredCodes.length}
+                          itemSize={65} // Row height + border
+                          width="100%"
+                          className="min-w-[800px]"
+                      >
+                          {Row}
+                      </FixedSizeList>
                   ) : (
-                    <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center">
-                        No codes found.
-                      </TableCell>
-                    </TableRow>
+                      <div className="flex items-center justify-center h-full text-muted-foreground">
+                          No codes found.
+                      </div>
                   )}
-                </TableBody>
-              </Table>
-            </ScrollArea>
+              </>
+            )}
           </div>
 
           <Dialog open={!!editingCode} onOpenChange={(open) => !open && handleEditClose()}>
