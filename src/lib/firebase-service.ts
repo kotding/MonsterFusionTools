@@ -245,6 +245,9 @@ export async function uploadFile(
   path: string,
   onProgress: (progress: number) => void
 ): Promise<string> {
+  // Combine the root, the current path, and the file name.
+  // The `path` parameter (currentPath) already ends with a "/" if it's a folder,
+  // or is an empty string if it's the root. This handles both cases.
   const fullPath = `${FILE_STORAGE_ROOT}${path}${file.name}`;
   const fileRef = storageRef(storage1, fullPath);
   const uploadTask = uploadBytesResumable(fileRef, file);
