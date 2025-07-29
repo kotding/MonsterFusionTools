@@ -1,9 +1,12 @@
 import { ref, set, get, remove, child, DataSnapshot, Database } from "firebase/database";
-import type { GiftCode, Reward, EditCodeFormValues, User, BannedAccounts, DbKey } from "@/types";
-import { db1, db2 } from "./firebase"; // Import the initialized database instances
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, listAll, deleteObject, type StorageReference, type FirebaseStorage } from "firebase/storage";
+import type { GiftCode, Reward, EditCodeFormValues, User, BannedAccounts, DbKey, StoredFile } from "@/types";
+import { db1, db2, storage1, storage2 } from "./firebase"; // Import the initialized instances
 import { getClassCharForPieceType } from "@/types/rewards";
 
 const dbs: Record<DbKey, Database> = { db1, db2 };
+const storages: Record<DbKey, FirebaseStorage> = { db1: storage1, db2: storage2 };
+
 
 function processRewards(rewards: Reward[]): any[] {
     return rewards.map((r: Reward) => {
@@ -222,4 +225,83 @@ export async function unbanUser(uid: string, dbKey: DbKey): Promise<void> {
         console.error(`Failed to unban user in ${dbKey}:`, error);
         throw new Error(`An error occurred while unbanning the user in ${dbKey}.`);
     }
+}
+
+// --- File Storage ---
+
+/**
+ * Uploads a file to Firebase Storage.
+ * @param file The file to upload.
+ * @param dbKey The key of the storage to use.
+ * @param onProgress A callback to report upload progress.
+ * @returns A promise that resolves with the download URL.
+ */
+export async function uploadFile(
+  file: File,
+  dbKey: DbKey,
+  onProgress: (progress: number) => void
+): Promise<string> {
+  const selectedStorage = storages[dbKey];
+  const fileRef = storageRef(selectedStorage, `uploads/${file.name}`);
+  const uploadTask = uploadBytesResumable(fileRef, file);
+
+  return new Promise((resolve, reject) => {
+    uploadTask.on(
+      "state_changed",
+      (snapshot) => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        onProgress(progress);
+      },
+      (error) => {
+        console.error("Upload failed:", error);
+        reject(new Error("File upload failed."));
+      },
+      async () => {
+        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+        resolve(downloadURL);
+      }
+    );
+  });
+}
+
+/**
+ * Lists all files in the uploads directory.
+ * @param dbKey The key of the storage to use.
+ * @returns A promise that resolves to an array of StoredFile objects.
+ */
+export async function listFiles(dbKey: DbKey): Promise<StoredFile[]> {
+  const selectedStorage = storages[dbKey];
+  const listRef = storageRef(selectedStorage, 'uploads');
+  const res = await listAll(listRef);
+  
+  const files = await Promise.all(
+    res.items.map(async (itemRef) => {
+      const downloadURL = await getDownloadURL(itemRef);
+      const metadata = await itemRef.getMetadata();
+      return {
+        name: metadata.name,
+        url: downloadURL,
+        size: metadata.size,
+        type: metadata.contentType || 'unknown',
+        created: metadata.timeCreated,
+      };
+    })
+  );
+  return files;
+}
+
+/**
+ * Deletes a file from Firebase Storage.
+ * @param fileName The name of the file to delete.
+ * @param dbKey The key of the storage to use.
+ */
+export async function deleteFile(fileName: string, dbKey: DbKey): Promise<void> {
+  const selectedStorage = storages[dbKey];
+  const fileRef = storageRef(selectedStorage, `uploads/${fileName}`);
+  try {
+    await deleteObject(fileRef);
+  } catch (error) {
+    console.error("Delete failed:", error);
+    throw new Error("Could not delete the file.");
+  }
 }

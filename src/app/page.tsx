@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Gift, Users } from 'lucide-react';
+import { Gift, Users, FolderKanban } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -58,6 +58,21 @@ export default function Home() {
               <CardContent className="flex-grow">
                 <CardDescription>
                   View, search, and manage user accounts.
+                </CardDescription>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/file-storage">
+            <Card className="flex h-full flex-col transition-all hover:shadow-lg hover:-translate-y-1">
+              <CardHeader>
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                  <FolderKanban className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle>File Storage</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-grow">
+                <CardDescription>
+                  Upload, manage, and share files.
                 </CardDescription>
               </CardContent>
             </Card>

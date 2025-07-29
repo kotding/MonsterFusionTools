@@ -76,3 +76,12 @@ export type User = {
 export type BannedAccounts = {
   [uid: string]: "Banned";
 };
+
+// Represents a file stored in Firebase Storage
+export type StoredFile = {
+    name: string;
+    url: string;
+    size: number;
+    type: string;
+    created: string;
+};
