@@ -246,11 +246,11 @@ export async function uploadFile(
   path: string,
   onProgress: (progress: number) => void
 ): Promise<string> {
-  // Construct the base path, ensuring it ends with a slash if it's not empty
-  const basePath = path ? `${path.endsWith('/') ? path : path + '/'}` : '';
-  const fullStoragePath = `${FILE_STORAGE_ROOT}${basePath}${file.name}`;
-  
-  const fileRef = storageRef(storage1, fullStoragePath);
+  const fullPath = [FILE_STORAGE_ROOT, path, file.name]
+    .filter(Boolean) // Remove empty parts like the initial "" path
+    .join('/');
+
+  const fileRef = storageRef(storage1, fullPath);
   const uploadTask = uploadBytesResumable(fileRef, file);
 
   return new Promise((resolve, reject) => {
@@ -361,5 +361,3 @@ export async function createFolder(path: string, folderName: string): Promise<vo
         throw new Error("Could not create the folder.");
     }
 }
-
-    
