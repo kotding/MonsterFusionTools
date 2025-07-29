@@ -5,6 +5,37 @@ import { getClassCharForPieceType } from "@/types/rewards";
 
 const dbs: Record<DbKey, Database> = { db1, db2 };
 
+function processRewards(rewards: Reward[]): any[] {
+    return rewards.map((r: Reward) => {
+        const reward: any = {
+            rewardType: r.rewardType,
+            rewardAmount: r.rewardAmount,
+            monsterId: 0,
+            iapKey: "",
+            artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" }
+        };
+
+        if (r.rewardType === 'ARTIFACT' && r.artifactInfo) {
+            reward.artifactInfo = {
+                ...r.artifactInfo,
+                ClassChar: getClassCharForPieceType(r.artifactInfo.Artifact_PieceType),
+            };
+        } else if (r.rewardType === 'MONSTER') {
+            reward.monsterId = r.monsterId;
+        } else if (r.rewardType === 'PURCHASE_PACK') {
+            reward.iapKey = r.iapKey || "";
+        }
+        
+        // Remove empty strings for cleaner data in Firebase
+        if(reward.iapKey === "") {
+            delete reward.iapKey;
+        }
+
+        return reward;
+    });
+}
+
+
 /**
  * Adds a new gift code to both Firebase Realtime Databases under "RedeemCodes".
  * @param newCodeData - The data for the new gift code.
@@ -19,29 +50,7 @@ export async function addGiftCode(newCodeData: Omit<GiftCode, 'id'>): Promise<Gi
     throw new Error(`Code "${newCodeData.code}" already exists.`);
   }
 
-  const processedRewards = newCodeData.listRewards.map((reward: Reward) => {
-    if (reward.rewardType === 'ARTIFACT') {
-      return {
-        ...reward,
-        monsterId: 0,
-        artifactInfo: {
-          ...reward.artifactInfo,
-          ClassChar: getClassCharForPieceType(reward.artifactInfo.Artifact_PieceType),
-        },
-      };
-    }
-    if (reward.rewardType === 'MONSTER') {
-        return {
-            ...reward,
-            artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" }
-        }
-    }
-    return {
-        ...reward,
-        monsterId: 0,
-        artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" }
-    }
-  });
+  const processedRewards = processRewards(newCodeData.listRewards);
 
   const newEntry: GiftCode = {
     ...newCodeData,
@@ -130,29 +139,7 @@ export async function updateGiftCode(codeId: string, updatedData: EditCodeFormVa
     const expireDate = new Date();
     expireDate.setDate(expireDate.getDate() + updatedData.expireDays);
 
-    const processedRewards = updatedData.listRewards.map((reward: Reward) => {
-        if (reward.rewardType === 'ARTIFACT') {
-          return {
-            ...reward,
-            monsterId: 0,
-            artifactInfo: {
-              ...reward.artifactInfo,
-              ClassChar: getClassCharForPieceType(reward.artifactInfo.Artifact_PieceType),
-            },
-          };
-        }
-         if (reward.rewardType === 'MONSTER') {
-            return {
-                ...reward,
-                artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" }
-            }
-        }
-        return {
-            ...reward,
-            monsterId: 0,
-            artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" }
-        }
-    });
+    const processedRewards = processRewards(updatedData.listRewards);
 
     const dataToSave: Omit<GiftCode, 'id'> = {
         ...existingCode,

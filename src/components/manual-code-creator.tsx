@@ -26,7 +26,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { addGiftCode } from "@/lib/firebase-service";
 import { manualGiftCodeSchema, type GiftCode } from "@/types";
-import { REWARD_TYPES, ARTIFACT_PIECE_TYPES, ARTIFACT_RARITIES, getClassCharForPieceType } from "@/types/rewards";
+import { REWARD_TYPES, ARTIFACT_PIECE_TYPES, ARTIFACT_RARITIES, getClassCharForPieceType, IAP_PACKS } from "@/types/rewards";
 import {
   Card,
   CardContent,
@@ -38,7 +38,7 @@ import { Separator } from "./ui/separator";
 
 type ManualCodeFormValues = z.infer<typeof manualGiftCodeSchema>;
 
-function RewardFields({ index, control }: { index: number, control: any }) {
+function RewardFields({ index, control, form }: { index: number, control: any, form: any }) {
   const rewardType = useWatch({
     control,
     name: `listRewards.${index}.rewardType`,
@@ -109,6 +109,33 @@ function RewardFields({ index, control }: { index: number, control: any }) {
             )}
         />
       )}
+       {rewardType === "PURCHASE_PACK" && (
+        <div className="grid grid-cols-2 gap-2 rounded-md border bg-muted/50 p-2">
+           <FormField
+              control={control}
+              name={`listRewards.${index}.iapKey`}
+              render={({ field }) => (
+                <FormItem>
+                    <FormLabel className="sr-only">IAP Key</FormLabel>
+                    <FormControl>
+                        <Input placeholder="Enter IAP Key" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+              )}
+            />
+             <Select onValueChange={(value) => form.setValue(`listRewards.${index}.iapKey`, value)}>
+                <SelectTrigger>
+                    <SelectValue placeholder="Or select a pack" />
+                </SelectTrigger>
+                <SelectContent>
+                    {IAP_PACKS.map(pack => (
+                        <SelectItem key={pack} value={pack}>{pack}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
+      )}
     </div>
   );
 }
@@ -125,7 +152,8 @@ export function ManualCodeCreator() {
       listRewards: [{ 
         rewardType: "DIAMOND", 
         rewardAmount: 100, 
-        monsterId: 0, 
+        monsterId: 0,
+        iapKey: "", 
         artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" } 
       }],
       maxClaimCount: 1,
@@ -164,23 +192,25 @@ export function ManualCodeCreator() {
         const newCodeData: Omit<GiftCode, "id"> = {
           code: values.code,
           listRewards: values.listRewards.map(r => {
+            const reward = {
+                rewardType: r.rewardType,
+                rewardAmount: r.rewardAmount,
+                monsterId: 0,
+                iapKey: "",
+                artifactInfo: { Artifact_PieceType: "None" as const, Artifact_Rarity: "None" as const, ClassChar: "A" }
+            };
+
             if (r.rewardType === 'ARTIFACT') {
-              return {
-                ...r,
-                 monsterId: 0,
-                artifactInfo: {
-                  ...r.artifactInfo,
-                  ClassChar: getClassCharForPieceType(r.artifactInfo.Artifact_PieceType)
-                }
-              }
+              reward.artifactInfo = {
+                ...r.artifactInfo,
+                ClassChar: getClassCharForPieceType(r.artifactInfo.Artifact_PieceType)
+              };
+            } else if (r.rewardType === 'MONSTER') {
+                reward.monsterId = r.monsterId;
+            } else if (r.rewardType === 'PURCHASE_PACK') {
+                reward.iapKey = r.iapKey;
             }
-             if(r.rewardType !== 'MONSTER') {
-                return { ...r, monsterId: 0, artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" } }
-             }
-            return {
-              ...r,
-              artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" }
-            }
+            return reward;
           }),
           maxClaimCount: values.maxClaimCount,
           currClaimCount: 0,
@@ -304,7 +334,7 @@ export function ManualCodeCreator() {
                                 <span className="sr-only">Remove reward</span>
                             </Button>
                         </div>
-                        <RewardFields index={index} control={form.control} />
+                        <RewardFields index={index} control={form.control} form={form} />
                     </div>
                 ))}
                  <Button
@@ -315,6 +345,7 @@ export function ManualCodeCreator() {
                         rewardType: "GOLD", 
                         rewardAmount: 1000, 
                         monsterId: 0, 
+                        iapKey: "",
                         artifactInfo: { Artifact_PieceType: "None", Artifact_Rarity: "None", ClassChar: "A" } 
                     })}
                 >

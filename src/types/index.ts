@@ -13,8 +13,9 @@ export const artifactInfoSchema = z.object({
 // Base schema for a single reward
 export const rewardSchema = z.object({
   rewardType: z.enum(REWARD_TYPES),
-  rewardAmount: z.coerce.number().min(1, "Amount must be at least 1."),
+  rewardAmount: z.coerce.number().min(0, "Amount must be at least 0."),
   monsterId: z.coerce.number().default(0),
+  iapKey: z.string().optional(),
   artifactInfo: artifactInfoSchema.default({}),
 });
 

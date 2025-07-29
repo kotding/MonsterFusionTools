@@ -61,6 +61,7 @@ import {
   REWARD_TYPES,
   ARTIFACT_PIECE_TYPES,
   ARTIFACT_RARITIES,
+  IAP_PACKS,
 } from "@/types/rewards";
 import { differenceInDays, parseISO } from "date-fns";
 import { ScrollArea } from "./ui/scroll-area";
@@ -69,10 +70,12 @@ function RewardFields({
   prefix,
   index,
   control,
+  form,
 }: {
   prefix: "listRewards" | `edit.${number}.listRewards`;
   index: number;
   control: any;
+  form: any;
 }) {
   const rewardType = useWatch({
     control,
@@ -162,6 +165,33 @@ function RewardFields({
           )}
         />
       )}
+      {rewardType === "PURCHASE_PACK" && (
+        <div className="grid grid-cols-2 gap-2 rounded-md border bg-muted/50 p-2">
+           <FormField
+              control={control}
+              name={`${prefix}.${index}.iapKey`}
+              render={({ field }) => (
+                <FormItem>
+                    <FormLabel className="sr-only">IAP Key</FormLabel>
+                    <FormControl>
+                        <Input placeholder="Enter IAP Key" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+              )}
+            />
+             <Select onValueChange={(value) => form.setValue(`${prefix}.${index}.iapKey`, value)}>
+                <SelectTrigger>
+                    <SelectValue placeholder="Or select a pack" />
+                </SelectTrigger>
+                <SelectContent>
+                    {IAP_PACKS.map(pack => (
+                        <SelectItem key={pack} value={pack}>{pack}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
+      )}
     </div>
   );
 }
@@ -179,9 +209,8 @@ function EditCodeForm({
   const form = useForm<EditCodeFormValues>({
     resolver: zodResolver(editCodeSchema),
     defaultValues: {
-      listRewards: code.listRewards,
-      maxClaimCount: code.maxClaimCount,
-      currClaimCount: code.currClaimCount,
+      ...code,
+      listRewards: code.listRewards.map(r => ({ ...r, iapKey: r.iapKey || "" })),
       expireDays: differenceInDays(parseISO(code.expire), new Date()),
     },
   });
@@ -289,6 +318,7 @@ function EditCodeForm({
                   prefix="listRewards"
                   index={index}
                   control={form.control}
+                  form={form}
                 />
               </div>
             ))}
@@ -301,6 +331,7 @@ function EditCodeForm({
                   rewardType: "GOLD",
                   rewardAmount: 1000,
                   monsterId: 0,
+                  iapKey: "",
                   artifactInfo: {
                     Artifact_PieceType: "None",
                     Artifact_Rarity: "None",
