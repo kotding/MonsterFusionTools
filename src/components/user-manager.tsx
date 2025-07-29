@@ -1,15 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo, useTransition, FormEvent } from "react";
+import { useState, useEffect, useMemo, useTransition, FormEvent, useRef } from "react";
 import Image from "next/image";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { FixedSizeList } from 'react-window';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -34,7 +27,6 @@ import {
 } from "@/lib/firebase-service";
 import type { User, BannedAccounts, DbKey } from "@/types";
 import { Loader2, ArrowUpDown, UserX, UserCheck, Search } from "lucide-react";
-import { ScrollArea } from "./ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 type SortKey = "MonsterLevel" | "NumDiamond" | "NumGold" | "default";
@@ -55,6 +47,7 @@ export function UserManager({ dbKey }: UserManagerProps) {
   
   const [sortKey, setSortKey] = useState<SortKey>("default");
   const { toast } = useToast();
+  const listRef = useRef<FixedSizeList>(null);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -80,6 +73,13 @@ export function UserManager({ dbKey }: UserManagerProps) {
     fetchData();
   }, [dbKey]);
 
+  useEffect(() => {
+    // Reset scroll position when users change
+    if (listRef.current) {
+        listRef.current.scrollTo(0);
+    }
+  }, [filterText, sortKey, dbKey]);
+
   const handleBanToggle = (user: User) => {
     startActionTransition(async () => {
       try {
@@ -98,13 +98,26 @@ export function UserManager({ dbKey }: UserManagerProps) {
             variant: "destructive",
           });
         }
-        fetchData(); // Refresh data after action
+        
+        // Optimistically update the UI
+        setBannedAccounts(prev => {
+            const newBanned = { ...prev };
+            if (user.isBanned) {
+                delete newBanned[user.id];
+            } else {
+                newBanned[user.id] = "Banned";
+            }
+            return newBanned;
+        });
+
       } catch (error: any) {
         toast({
           variant: "destructive",
           title: "Action Failed",
           description: error.message || "Could not perform the action.",
         });
+        // Revert UI on failure
+        fetchData();
       }
     });
   };
@@ -144,12 +157,90 @@ export function UserManager({ dbKey }: UserManagerProps) {
     return new Intl.NumberFormat("en-US").format(num);
   };
   
-  const truncateString = (str: string, num: number) => {
+  const truncateString = (str: string | undefined, num: number) => {
     if (!str || str.length <= num) {
       return str;
     }
     return str.slice(0, num) + '...';
   };
+  
+  const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => {
+    const user = filteredAndSortedUsers[index];
+    if (!user) return null;
+
+    return (
+        <div style={style} className={cn("flex items-center border-b", user.isBanned ? "bg-destructive/10" : "hover:bg-muted/50")}>
+            <div className="p-4 w-[80px] shrink-0">
+                <Image
+                    src={user.AvatarUrl || `https://placehold.co/40x40.png`}
+                    alt={user.UserName || 'User avatar'}
+                    width={40}
+                    height={40}
+                    className="rounded-full"
+                    unoptimized
+                    data-ai-hint="avatar"
+                />
+            </div>
+            <div className="p-4 flex-1 font-medium min-w-0">
+                 <Tooltip>
+                    <TooltipTrigger asChild>
+                        <p className="truncate">{user.UserName}</p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>{user.UserName}</p>
+                    </TooltipContent>
+                </Tooltip>
+            </div>
+            <div className="p-4 flex-1 font-mono text-xs text-muted-foreground min-w-0">
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <p className="truncate">{user.UID}</p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>{user.UID}</p>
+                    </TooltipContent>
+                </Tooltip>
+            </div>
+            <div className="p-4 w-24 text-right shrink-0">{formatNumber(user.MonsterLevel)}</div>
+            <div className="p-4 w-28 text-right text-blue-500 shrink-0">{formatNumber(user.NumDiamond)}</div>
+            <div className="p-4 w-28 text-right text-amber-500 shrink-0">{formatNumber(user.NumGold)}</div>
+            <div className="p-4 w-28 text-center shrink-0">
+                {user.isBanned ? (
+                   <span className="px-2 py-1 text-xs font-semibold rounded-full bg-destructive text-destructive-foreground">Banned</span>
+                ) : (
+                   <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-500 text-white">Active</span>
+                )}
+            </div>
+            <div className="p-4 w-32 text-right shrink-0">
+               <Button
+                  variant={user.isBanned ? "default" : "destructive"}
+                  size="sm"
+                  onClick={() => handleBanToggle(user)}
+                  disabled={isActionPending}
+                >
+                  {isActionPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 
+                    user.isBanned ? <UserCheck className="h-4 w-4" /> : <UserX className="h-4 w-4" />
+                  }
+                  <span className="ml-2">{user.isBanned ? 'Unban' : 'Ban'}</span>
+                </Button>
+            </div>
+        </div>
+    )
+  }
+
+  const ListHeader = () => (
+     <div className="flex items-center sticky top-0 bg-background z-10 border-b font-medium text-muted-foreground h-12">
+        <div className="p-4 w-[80px] shrink-0">Avatar</div>
+        <div className="p-4 flex-1">Username</div>
+        <div className="p-4 flex-1">UID</div>
+        <div className="p-4 w-24 text-right shrink-0">Level</div>
+        <div className="p-4 w-28 text-right shrink-0">Diamond</div>
+        <div className="p-4 w-28 text-right shrink-0">Gold</div>
+        <div className="p-4 w-28 text-center shrink-0">Status</div>
+        <div className="p-4 w-32 text-right shrink-0">Actions</div>
+    </div>
+  )
+
 
   return (
     <TooltipProvider>
@@ -178,103 +269,38 @@ export function UserManager({ dbKey }: UserManagerProps) {
             </Select>
         </div>
       </div>
-      <div className="rounded-md border overflow-x-auto relative">
-         {isFiltering && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-sm">
+      <div className="rounded-md border h-[60vh] relative">
+         {(isFiltering || isLoading) && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/50 backdrop-blur-sm">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
          )}
-        <ScrollArea className="h-[60vh] min-w-[800px]">
-          <Table>
-            <TableHeader className="sticky top-0 bg-background">
-              <TableRow>
-                <TableHead className="w-[80px]">Avatar</TableHead>
-                <TableHead>Username</TableHead>
-                <TableHead>UID</TableHead>
-                <TableHead className="text-right">Level</TableHead>
-                <TableHead className="text-right">Diamond</TableHead>
-                <TableHead className="text-right">Gold</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody className={cn(isFiltering && "opacity-50")}>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center">
-                    <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
-                  </TableCell>
-                </TableRow>
-              ) : filteredAndSortedUsers.length > 0 ? (
-                filteredAndSortedUsers.map((user) => (
-                  <TableRow key={user.id} className={user.isBanned ? "bg-destructive/10" : ""}>
-                    <TableCell>
-                      <Image
-                        src={user.AvatarUrl || `https://placehold.co/40x40.png`}
-                        alt={user.UserName || 'User avatar'}
-                        width={40}
-                        height={40}
-                        className="rounded-full"
-                        unoptimized
-                        data-ai-hint="avatar"
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <span className="w-40 inline-block">{truncateString(user.UserName, 40)}</span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>{user.UserName}</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                           <span className="w-40 inline-block">{truncateString(user.UID, 40)}</span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{user.UID}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TableCell>
-                    <TableCell className="text-right">{formatNumber(user.MonsterLevel)}</TableCell>
-                    <TableCell className="text-right text-blue-500">{formatNumber(user.NumDiamond)}</TableCell>
-                    <TableCell className="text-right text-amber-500">{formatNumber(user.NumGold)}</TableCell>
-                    <TableCell className="text-center">
-                        {user.isBanned ? (
-                           <span className="px-2 py-1 text-xs font-semibold rounded-full bg-destructive text-destructive-foreground">Banned</span>
-                        ) : (
-                           <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-500 text-white">Active</span>
-                        )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                       <Button
-                          variant={user.isBanned ? "default" : "destructive"}
-                          size="sm"
-                          onClick={() => handleBanToggle(user)}
-                          disabled={isActionPending}
-                        >
-                          {isActionPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 
-                            user.isBanned ? <UserCheck className="h-4 w-4" /> : <UserX className="h-4 w-4" />
-                          }
-                          <span className="ml-2">{user.isBanned ? 'Unban' : 'Ban'}</span>
-                        </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center">
-                    No users found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </ScrollArea>
+        
+        { !isLoading && (
+            <>
+                <ListHeader />
+                {filteredAndSortedUsers.length > 0 ? (
+                    <FixedSizeList
+                        ref={listRef}
+                        height={_listHeight - 48} // 60vh minus header height
+                        itemCount={filteredAndSortedUsers.length}
+                        itemSize={73} // Row height + border
+                        width="100%"
+                        className="min-w-[1100px]" // Force horizontal scroll if needed
+                    >
+                        {Row}
+                    </FixedSizeList>
+                ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                        No users found.
+                    </div>
+                )}
+            </>
+        )}
       </div>
     </TooltipProvider>
   );
 }
+
+// A bit of a hack to get the viewport height for the list
+const _listHeight = typeof window !== 'undefined' ? window.innerHeight * 0.6 : 500;
