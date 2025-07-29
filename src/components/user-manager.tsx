@@ -33,8 +33,9 @@ import {
   unbanUser,
 } from "@/lib/firebase-service";
 import type { User, BannedAccounts, DbKey } from "@/types";
-import { Loader2, ArrowUpDown, UserX, UserCheck } from "lucide-react";
+import { Loader2, ArrowUpDown, UserX, UserCheck, Search } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 type SortKey = "MonsterLevel" | "NumDiamond" | "NumGold" | "default";
 
@@ -47,7 +48,10 @@ export function UserManager({ dbKey }: UserManagerProps) {
   const [bannedAccounts, setBannedAccounts] = useState<BannedAccounts>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isActionPending, startActionTransition] = useTransition();
+  
   const [filterText, setFilterText] = useState("");
+  const [isFiltering, startFilteringTransition] = useTransition();
+  
   const [sortKey, setSortKey] = useState<SortKey>("default");
   const { toast } = useToast();
 
@@ -104,6 +108,12 @@ export function UserManager({ dbKey }: UserManagerProps) {
     });
   };
 
+  const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    startFilteringTransition(() => {
+        setFilterText(e.target.value);
+    });
+  };
+
   const filteredAndSortedUsers = useMemo(() => {
     const usersWithBanStatus = users.map((user) => ({
       ...user,
@@ -141,12 +151,15 @@ export function UserManager({ dbKey }: UserManagerProps) {
   return (
     <TooltipProvider>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
-        <Input
-          placeholder="Search by Username or UID..."
-          value={filterText}
-          onChange={(e) => setFilterText(e.target.value)}
-          className="max-w-xs"
-        />
+        <div className="relative">
+             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+             <Input
+                placeholder="Search by Username or UID..."
+                value={filterText}
+                onChange={handleFilterChange}
+                className="max-w-xs pl-10"
+             />
+        </div>
         <div className="flex items-center gap-2">
            <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
            <Select onValueChange={(value) => setSortKey(value as SortKey)} defaultValue="default">
@@ -162,7 +175,12 @@ export function UserManager({ dbKey }: UserManagerProps) {
             </Select>
         </div>
       </div>
-      <div className="rounded-md border overflow-x-auto">
+      <div className="rounded-md border overflow-x-auto relative">
+         {isFiltering && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-sm">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+         )}
         <ScrollArea className="h-[60vh] min-w-[800px]">
           <Table>
             <TableHeader className="sticky top-0 bg-background">
@@ -177,7 +195,7 @@ export function UserManager({ dbKey }: UserManagerProps) {
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody className={cn(isFiltering && "opacity-50")}>
               {isLoading ? (
                 <TableRow>
                   <TableCell colSpan={8} className="h-24 text-center">
