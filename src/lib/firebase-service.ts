@@ -1,4 +1,5 @@
 
+
 import { ref, set, get, remove, child, DataSnapshot, Database } from "firebase/database";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, listAll, deleteObject, uploadString, getMetadata, type StorageReference, type FirebaseStorage } from "firebase/storage";
 import type { GiftCode, Reward, EditCodeFormValues, User, BannedAccounts, DbKey, StoredFile } from "@/types";
@@ -246,9 +247,10 @@ export async function uploadFile(
   onProgress: (progress: number) => void
 ): Promise<string> {
   // Combine the root, the current path, and the file name.
-  // The `path` parameter (currentPath) already ends with a "/" if it's a folder,
-  // or is an empty string if it's the root. This handles both cases.
-  const fullPath = `${FILE_STORAGE_ROOT}${path}${file.name}`;
+  // This logic correctly handles if path is empty (root) or a subfolder.
+  const basePath = [FILE_STORAGE_ROOT, path].filter(Boolean).join('');
+  const fullPath = `${basePath}${file.name}`;
+  
   const fileRef = storageRef(storage1, fullPath);
   const uploadTask = uploadBytesResumable(fileRef, file);
 
